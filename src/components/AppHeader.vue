@@ -115,7 +115,10 @@ function handleImport() {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-0.5 sm:gap-1" :class="{ 'hidden sm:flex': showSearch }">
+      <div
+        class="flex items-center gap-0.5 sm:gap-1"
+        :class="{ 'hidden sm:flex': showSearch }"
+      >
         <!-- Search (desktop inline) -->
         <div class="hidden sm:flex items-center">
           <div
@@ -301,22 +304,34 @@ function handleImport() {
       <div
         v-if="showSearch"
         class="sm:hidden flex items-center gap-2 px-4 py-2"
-        style="border-bottom: 1px solid var(--border); background: var(--bg-elevated)"
+        style="
+          border-bottom: 1px solid var(--border);
+          background: var(--bg-elevated);
+        "
       >
         <div class="relative flex-1">
           <input
             ref="searchInput"
             :value="search"
-            @input="emit('update:search', ($event.target as HTMLInputElement).value)"
+            @input="
+              emit('update:search', ($event.target as HTMLInputElement).value)
+            "
             @keydown.escape="toggleSearch"
             type="text"
             placeholder="Buscar en tu cronolog..."
             class="w-full px-3 py-2 pr-8 rounded-lg text-sm outline-none"
-            style="background: var(--bg-muted); color: var(--text); border: 1px solid var(--border)"
+            style="
+              background: var(--bg-muted);
+              color: var(--text);
+              border: 1px solid var(--border);
+            "
           />
           <button
             v-if="search"
-            @click="emit('update:search', ''); searchInput?.focus()"
+            @click="
+              emit('update:search', '');
+              searchInput?.focus();
+            "
             class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded cursor-pointer"
             style="color: var(--text-faint)"
           >

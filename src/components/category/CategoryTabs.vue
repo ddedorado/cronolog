@@ -10,9 +10,7 @@ const scrollRef = ref<HTMLElement | null>(null);
 
 // Only show categories that have items in the current year
 const categoriesWithItems = computed(() =>
-  store.sortedCategories.filter(
-    (c) => store.itemsForCategory(c.id).length > 0,
-  ),
+  store.sortedCategories.filter((c) => store.itemsForCategory(c.id).length > 0),
 );
 
 const totalItems = computed(() =>

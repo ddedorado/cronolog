@@ -164,7 +164,7 @@ function getOriginalIndex(itemId: string): number {
             <div
               v-if="showSortMenu"
               class="sm:hidden fixed inset-0 z-[99]"
-              style="background: rgba(0,0,0,0.3)"
+              style="background: rgba(0, 0, 0, 0.3)"
               @click="showSortMenu = false"
             />
             <div
