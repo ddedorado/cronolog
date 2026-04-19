@@ -48,9 +48,7 @@ const ItemDetailModal = defineAsyncComponent(
 const CategoryFormModal = defineAsyncComponent(
   () => import("@/components/category/CategoryFormModal.vue"),
 );
-const SettingsModal = defineAsyncComponent(
-  () => import("@/components/SettingsModal.vue"),
-);
+import SettingsModal from "@/components/SettingsModal.vue";
 const TableView = defineAsyncComponent(
   () => import("@/components/TableView.vue"),
 );

@@ -265,13 +265,54 @@ export const useCronologStore = defineStore(
       }
 
       // Add new default categories if missing (for existing users, skip deleted ones)
+      // Also skip if a category with the same name already exists (user may have created one manually)
+      // Normalize names by stripping diacritics so "Peliculas" matches "Películas"
+      const normalizeName = (n: string) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
       const existingIds = new Set(categories.value.map((c) => c.id))
+      const existingNames = new Set(categories.value.map((c) => normalizeName(c.name)))
       const deletedIds = new Set(deletedCategoryIds.value)
-      const newDefaults = DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id) && !deletedIds.has(c.id))
+      const newDefaults = DEFAULT_CATEGORIES.filter((c) =>
+        !existingIds.has(c.id) && !deletedIds.has(c.id) && !existingNames.has(normalizeName(c.name)),
+      )
       if (newDefaults.length > 0) {
         const maxOrder = Math.max(...categories.value.map((c) => c.order), -1)
         const toAdd = newDefaults.map((c, i) => ({ ...c, order: maxOrder + 1 + i }))
         categories.value = [...categories.value, ...toAdd]
+      }
+
+      // Deduplicate categories by name (keep the one with items, or the first one)
+      // Uses accent-normalized comparison so "Peliculas" and "Películas" are treated as duplicates
+      const seenNames = new Map<string, number>()
+      const dupeIds: string[] = []
+      const dupeToKeeper = new Map<string, string>() // map removed cat id → keeper cat id
+      for (let i = 0; i < categories.value.length; i++) {
+        const key = normalizeName(categories.value[i].name)
+        if (seenNames.has(key)) {
+          const prevIdx = seenNames.get(key)!
+          const prevCat = categories.value[prevIdx]
+          const currCat = categories.value[i]
+          const prevHasItems = items.value.some((it) => it.categoryId === prevCat.id)
+          const currHasItems = items.value.some((it) => it.categoryId === currCat.id)
+          // Keep the one with items; if both or neither have items, keep the first
+          if (currHasItems && !prevHasItems) {
+            dupeIds.push(prevCat.id)
+            dupeToKeeper.set(prevCat.id, currCat.id)
+            seenNames.set(key, i)
+          } else {
+            dupeIds.push(currCat.id)
+            dupeToKeeper.set(currCat.id, prevCat.id)
+          }
+        } else {
+          seenNames.set(key, i)
+        }
+      }
+      if (dupeIds.length > 0) {
+        categories.value = categories.value.filter((c) => !dupeIds.includes(c.id))
+        // Migrate items from removed duplicates to the kept category
+        items.value = items.value.map((it) => {
+          const keeperId = dupeToKeeper.get(it.categoryId)
+          return keeperId ? { ...it, categoryId: keeperId } : it
+        })
       }
 
       // Migrate items: add new fields if missing
