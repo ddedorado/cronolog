@@ -4,6 +4,7 @@ import piniaPersistedState from 'pinia-plugin-persistedstate'
 import App from './App.vue'
 import router from './router'
 import { useCronologStore } from './stores/cronolog'
+import { useSettingsStore } from './stores/settings'
 import { useAuth } from './composables/useAuth'
 import { useSupabaseSync } from './composables/useSupabaseSync'
 import { scheduleWeeklyReminder, requestNotificationPermission } from './services/notifications'
@@ -23,6 +24,9 @@ app.provide('appLoading', appLoading)
 async function bootstrap() {
   const store = useCronologStore()
   store.migrateData()
+
+  const settingsStore = useSettingsStore()
+  settingsStore.ensureApiKeys()
 
   const { init, isAuthenticated } = useAuth()
   await init()

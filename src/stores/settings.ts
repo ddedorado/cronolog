@@ -26,6 +26,22 @@ export const useSettingsStore = defineStore(
     const autoEnrich = ref(true)
     const accentColor = ref('#3B82F6')
 
+    // Ensure all apiKeys fields exist (handles persisted state missing newer keys)
+    function ensureApiKeys() {
+      const defaults: ApiKeys = { tmdb: '', rawg: '', googlebooks: '', comicvine: '' }
+      const current = apiKeys.value
+      let patched = false
+      for (const key of Object.keys(defaults) as (keyof ApiKeys)[]) {
+        if (current[key] === undefined) {
+          current[key] = defaults[key]
+          patched = true
+        }
+      }
+      if (patched) {
+        apiKeys.value = { ...current }
+      }
+    }
+
     function hasKeyForSource(source: DataSource): boolean {
       if (source === 'none') return false
       if (NO_KEY_SOURCES.includes(source)) return true
@@ -45,6 +61,7 @@ export const useSettingsStore = defineStore(
       accentColor,
       hasKeyForSource,
       getKey,
+      ensureApiKeys,
     }
   },
   {

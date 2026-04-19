@@ -18,10 +18,10 @@ import { verifyComicVineKey } from "@/services/enrichment/comicvine";
 const emit = defineEmits<{ close: [] }>();
 const settings = useSettingsStore();
 
-const tmdbKey = ref(settings.apiKeys.tmdb);
-const rawgKey = ref(settings.apiKeys.rawg);
-const googlebooksKey = ref(settings.apiKeys.googlebooks);
-const comicvineKey = ref(settings.apiKeys.comicvine);
+const tmdbKey = ref(settings.apiKeys.tmdb ?? "");
+const rawgKey = ref(settings.apiKeys.rawg ?? "");
+const googlebooksKey = ref(settings.apiKeys.googlebooks ?? "");
+const comicvineKey = ref(settings.apiKeys.comicvine ?? "");
 const autoEnrich = ref(settings.autoEnrich);
 const accentColor = ref(settings.accentColor);
 
