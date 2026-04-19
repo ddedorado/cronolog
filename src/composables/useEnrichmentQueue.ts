@@ -89,8 +89,8 @@ export function useEnrichmentQueue() {
         }
 
         const apiKey = settings.getKey(category.dataSource)
-        // Extract author from custom fields if available (for books)
-        const authorField = (item.customFields?.autor ?? item.customFields?.author ?? '') as string
+        // Extract author/artist from custom fields if available
+        const authorField = (item.customFields?.autor ?? item.customFields?.author ?? item.customFields?.artista ?? '') as string
         const result = await enrich(item.title, category.dataSource, apiKey, category.name, authorField || undefined)
 
         if (!result) {
@@ -119,6 +119,12 @@ export function useEnrichmentQueue() {
         // Auto-fill author custom field if empty and enrichment has it
         if (result.extra?.author && !authorField) {
           const newCustomFields = { ...item.customFields, autor: result.extra.author }
+          updates.customFields = newCustomFields
+        }
+
+        // Auto-fill artist custom field for music
+        if (result.extra?.artist && !authorField) {
+          const newCustomFields = { ...(updates.customFields ?? item.customFields), artista: result.extra.artist }
           updates.customFields = newCustomFields
         }
 

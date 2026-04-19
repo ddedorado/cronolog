@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCronologStore } from "@/stores/cronolog";
 import { computed, ref } from "vue";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-vue-next";
+import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from "lucide-vue-next";
 import ConfirmModal from "@/components/ConfirmModal.vue";
 
 const store = useCronologStore();
@@ -14,6 +14,9 @@ const newYearInput = ref<number>(currentYear);
 const showDeleteConfirm = ref(false);
 const yearToDelete = ref<number | null>(null);
 const deleteItemCount = ref(0);
+
+// Mobile: show manage mode to reveal delete buttons
+const manageMode = ref(false);
 
 const displayYears = computed(() => {
   return store.availableYears;
@@ -76,7 +79,9 @@ function confirmDeleteYear() {
         <ChevronLeft :size="18" />
       </button>
 
-      <div class="flex gap-1 overflow-x-auto py-2 -my-2 px-1 -mx-1">
+      <div
+        class="flex gap-1 overflow-x-auto py-2 -my-2 px-1 -mx-1 scrollbar-none"
+      >
         <div
           v-for="year in displayYears"
           :key="year"
@@ -108,9 +113,15 @@ function confirmDeleteYear() {
               {{ yearItemCount(year) }}
             </span>
           </button>
+          <!-- Delete: visible on hover (desktop) or manage mode (mobile) -->
           <button
             @click.stop="deleteYear(year)"
-            class="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/year:opacity-100 transition-opacity cursor-pointer"
+            class="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+            :class="
+              manageMode
+                ? 'opacity-100 animate-wiggle'
+                : 'opacity-0 group-hover/year:opacity-100'
+            "
             style="background: #ef4444; color: white"
             title="Eliminar año"
           >
@@ -134,6 +145,17 @@ function confirmDeleteYear() {
         }"
       >
         <ChevronRight :size="18" />
+      </button>
+
+      <!-- Manage button (toggle delete mode for mobile) -->
+      <button
+        v-if="displayYears.length > 1"
+        @click="manageMode = !manageMode"
+        class="p-1.5 rounded-md transition-colors cursor-pointer sm:hidden"
+        :style="{ color: manageMode ? '#ef4444' : 'var(--text-faint)' }"
+        :title="manageMode ? 'Hecho' : 'Gestionar años'"
+      >
+        <Trash2 :size="14" />
       </button>
     </template>
 

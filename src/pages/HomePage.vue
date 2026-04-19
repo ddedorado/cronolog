@@ -3,11 +3,19 @@ import { useCronologStore } from "@/stores/cronolog";
 import { useSettingsStore } from "@/stores/settings";
 import { useTheme } from "@/composables/useTheme";
 import { useEnrichmentQueue } from "@/composables/useEnrichmentQueue";
+import { usePullToRefresh } from "@/composables/usePullToRefresh";
+import { useSupabaseSync } from "@/composables/useSupabaseSync";
 import AppHeader from "@/components/AppHeader.vue";
+import MobileNav from "@/components/MobileNav.vue";
 import YearSelector from "@/components/year/YearSelector.vue";
 import CategoryColumn from "@/components/category/CategoryColumn.vue";
 import YearStats from "@/components/stats/YearStats.vue";
 import EnrichmentToast from "@/components/EnrichmentToast.vue";
+import SpotlightSearch from "@/components/SpotlightSearch.vue";
+import FloatingAddButton from "@/components/FloatingAddButton.vue";
+import CategoryTabs from "@/components/category/CategoryTabs.vue";
+import ExpandedStats from "@/components/stats/ExpandedStats.vue";
+import ActivityTimeline from "@/components/ActivityTimeline.vue";
 import {
   ref,
   computed,
@@ -23,6 +31,11 @@ import {
   FolderPlus,
   LayoutGrid,
   List,
+  Table2,
+  BarChart3,
+  Clock,
+  RefreshCw,
+  Loader2,
 } from "lucide-vue-next";
 
 // Lazy-load modals (not needed until user interaction)
@@ -38,24 +51,52 @@ const CategoryFormModal = defineAsyncComponent(
 const SettingsModal = defineAsyncComponent(
   () => import("@/components/SettingsModal.vue"),
 );
+const TableView = defineAsyncComponent(
+  () => import("@/components/TableView.vue"),
+);
+const KeyboardShortcuts = defineAsyncComponent(
+  () => import("@/components/KeyboardShortcuts.vue"),
+);
+const ImportModal = defineAsyncComponent(
+  () => import("@/components/ImportModal.vue"),
+);
+const OnboardingV2 = defineAsyncComponent(
+  () => import("@/components/OnboardingV2.vue"),
+);
 
 const store = useCronologStore();
 const settingsStore = useSettingsStore();
 const { isDark, toggleDark } = useTheme();
 const { enqueueItem } = useEnrichmentQueue();
+const { loadFromCloud } = useSupabaseSync();
 
 // Search
 const searchQuery = ref("");
 
-// View mode
-const compactView = ref(false);
+// View mode: 'grid' | 'compact' | 'table' | 'stats' | 'timeline'
+const viewMode = ref<"grid" | "compact" | "table" | "stats" | "timeline">(
+  "grid",
+);
+const compactView = computed(() => viewMode.value === "compact");
+
+// Spotlight search
+const showSpotlight = ref(false);
+
+// Keyboard shortcuts help
+const showShortcuts = ref(false);
+
+// Import modal
+const showImportModal = ref(false);
+
+// Category filter (mobile tabs)
+const activeCategoryFilter = ref<string | null>(null);
 
 // Onboarding
 const showOnboarding = ref(false);
 
 function checkOnboarding() {
   const hasItems = store.items.length > 0;
-  const dismissed = localStorage.getItem("cronolog_onboarding_done");
+  const dismissed = localStorage.getItem("cronolog_onboarding_v2_done");
   if (!hasItems && !dismissed && store.hasYears) {
     showOnboarding.value = true;
   }
@@ -63,8 +104,21 @@ function checkOnboarding() {
 
 function dismissOnboarding() {
   showOnboarding.value = false;
-  localStorage.setItem("cronolog_onboarding_done", "1");
+  localStorage.setItem("cronolog_onboarding_v2_done", "1");
 }
+
+// Pull-to-refresh
+const { pullDistance, refreshing, threshold } = usePullToRefresh(async () => {
+  await loadFromCloud();
+});
+
+// Apply accent color on mount
+onMounted(() => {
+  document.documentElement.style.setProperty(
+    "--accent",
+    settingsStore.accentColor,
+  );
+});
 
 // Year transition direction
 const yearTransition = ref("slide-right");
@@ -76,6 +130,14 @@ watch(
     previousYear.value = newYear;
   },
 );
+
+// Filter items by category tab + search
+const filteredCategories = computed(() => {
+  if (!activeCategoryFilter.value) return store.sortedCategories;
+  return store.sortedCategories.filter(
+    (c) => c.id === activeCategoryFilter.value,
+  );
+});
 
 function filteredItemsForCategory(categoryId: string) {
   const items = store.itemsForCategory(categoryId);
@@ -187,10 +249,15 @@ const showCategoryModal = ref(false);
 const editingCategory = ref<Category | null>(null);
 const categoryModalKey = ref(0);
 
-// Category drag reorder
+// Category drag reorder (desktop only)
 const draggingCategoryId = ref<string | null>(null);
+const isTouchDevice = ref(false);
 
 function onCategoryDragStart(e: DragEvent, categoryId: string) {
+  if (isTouchDevice.value) {
+    e.preventDefault();
+    return;
+  }
   draggingCategoryId.value = categoryId;
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = "move";
@@ -231,12 +298,36 @@ function handleKeyboard(e: KeyboardEvent) {
   // Don't trigger when typing in inputs
   const tag = (e.target as HTMLElement).tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  // Don't trigger when any modal is open
+
+  // Cmd/Ctrl+K opens spotlight
+  if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    e.preventDefault();
+    showSpotlight.value = !showSpotlight.value;
+    return;
+  }
+
+  // Escape closes overlays
+  if (e.key === "Escape") {
+    if (showSpotlight.value) {
+      showSpotlight.value = false;
+      return;
+    }
+    if (showShortcuts.value) {
+      showShortcuts.value = false;
+      return;
+    }
+    return;
+  }
+
+  // Don't trigger other shortcuts when any modal is open
   if (
     showItemModal.value ||
     showDetailModal.value ||
     showCategoryModal.value ||
-    showSettingsModal.value
+    showSettingsModal.value ||
+    showSpotlight.value ||
+    showShortcuts.value ||
+    showImportModal.value
   )
     return;
 
@@ -248,18 +339,75 @@ function handleKeyboard(e: KeyboardEvent) {
     const years = store.availableYears;
     const idx = years.indexOf(store.activeYear);
     if (idx < years.length - 1) store.setActiveYear(years[idx + 1]);
+  } else if (e.key === "n" || e.key === "N") {
+    const firstCat = store.sortedCategories[0];
+    if (firstCat) openAddItem(firstCat.id);
+  } else if (e.key === "f" || e.key === "F") {
+    showSpotlight.value = true;
+  } else if (e.key === "s" || e.key === "S") {
+    showSettingsModal.value = true;
+  } else if (e.key === "?") {
+    showShortcuts.value = true;
+  } else if (e.key >= "1" && e.key <= "9") {
+    const idx = parseInt(e.key) - 1;
+    const cats = store.sortedCategories;
+    if (idx < cats.length) {
+      activeCategoryFilter.value =
+        activeCategoryFilter.value === cats[idx].id ? null : cats[idx].id;
+    }
   }
 }
 
 onMounted(() => {
   document.addEventListener("keydown", handleKeyboard);
   checkOnboarding();
+  isTouchDevice.value =
+    "ontouchstart" in window || navigator.maxTouchPoints > 0;
 });
 onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--bg)">
+  <div class="min-h-screen pb-16 sm:pb-0" style="background: var(--bg)">
+    <!-- Pull-to-refresh indicator -->
+    <div
+      v-if="pullDistance > 0 || refreshing"
+      class="fixed top-0 left-0 right-0 z-30 flex items-center justify-center pull-indicator"
+      :style="{ transform: `translateY(${Math.min(pullDistance, 60)}px)` }"
+    >
+      <div
+        class="flex items-center gap-2 px-3 py-1.5 rounded-full mt-2"
+        style="
+          background: var(--bg-elevated);
+          box-shadow: var(--shadow-card);
+          border: 1px solid var(--border);
+        "
+      >
+        <Loader2
+          v-if="refreshing"
+          :size="14"
+          class="animate-spin"
+          style="color: var(--text-muted)"
+        />
+        <RefreshCw
+          v-else
+          :size="14"
+          :style="{
+            color:
+              pullDistance >= threshold ? 'var(--text)' : 'var(--text-faint)',
+            transform: `rotate(${pullDistance * 3}deg)`,
+          }"
+        />
+        <span class="text-[10px]" style="color: var(--text-muted)">{{
+          refreshing
+            ? "Sincronizando..."
+            : pullDistance >= threshold
+              ? "Soltar para sincronizar"
+              : "Tira para sincronizar"
+        }}</span>
+      </div>
+    </div>
+
     <AppHeader
       :is-dark="isDark"
       v-model:search="searchQuery"
@@ -267,7 +415,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
       @open-settings="showSettingsModal = true"
     />
 
-    <main class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+    <main class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 pb-12">
       <!-- Empty state: no years -->
       <div
         v-if="!store.hasYears"
@@ -314,8 +462,11 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 
         <!-- Has categories -->
         <template v-else>
-          <!-- Add category (top) -->
-          <div class="mt-4 flex items-center justify-between">
+          <!-- Category filter tabs (mobile) -->
+          <CategoryTabs v-model="activeCategoryFilter" />
+
+          <!-- Toolbar: view toggle + actions -->
+          <div class="mt-4 flex items-center justify-between gap-2">
             <!-- View toggle -->
             <div
               class="flex items-center gap-0.5 p-0.5 rounded-lg"
@@ -325,83 +476,161 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
               "
             >
               <button
-                @click="compactView = false"
+                @click="viewMode = 'grid'"
                 class="p-1.5 rounded-md transition-colors cursor-pointer"
                 :style="{
-                  background: !compactView
-                    ? 'var(--bg-elevated)'
-                    : 'transparent',
-                  color: !compactView ? 'var(--text)' : 'var(--text-faint)',
-                  boxShadow: !compactView ? 'var(--shadow-card)' : 'none',
+                  background:
+                    viewMode === 'grid' ? 'var(--bg-elevated)' : 'transparent',
+                  color:
+                    viewMode === 'grid' ? 'var(--text)' : 'var(--text-faint)',
+                  boxShadow:
+                    viewMode === 'grid' ? 'var(--shadow-card)' : 'none',
                 }"
                 title="Vista detallada"
               >
                 <LayoutGrid :size="14" />
               </button>
               <button
-                @click="compactView = true"
+                @click="viewMode = 'compact'"
                 class="p-1.5 rounded-md transition-colors cursor-pointer"
                 :style="{
-                  background: compactView
-                    ? 'var(--bg-elevated)'
-                    : 'transparent',
-                  color: compactView ? 'var(--text)' : 'var(--text-faint)',
-                  boxShadow: compactView ? 'var(--shadow-card)' : 'none',
+                  background:
+                    viewMode === 'compact'
+                      ? 'var(--bg-elevated)'
+                      : 'transparent',
+                  color:
+                    viewMode === 'compact'
+                      ? 'var(--text)'
+                      : 'var(--text-faint)',
+                  boxShadow:
+                    viewMode === 'compact' ? 'var(--shadow-card)' : 'none',
                 }"
                 title="Vista compacta"
               >
                 <List :size="14" />
               </button>
+              <button
+                @click="viewMode = 'table'"
+                class="hidden sm:block p-1.5 rounded-md transition-colors cursor-pointer"
+                :style="{
+                  background:
+                    viewMode === 'table' ? 'var(--bg-elevated)' : 'transparent',
+                  color:
+                    viewMode === 'table' ? 'var(--text)' : 'var(--text-faint)',
+                  boxShadow:
+                    viewMode === 'table' ? 'var(--shadow-card)' : 'none',
+                }"
+                title="Vista tabla"
+              >
+                <Table2 :size="14" />
+              </button>
+              <button
+                @click="viewMode = 'stats'"
+                class="p-1.5 rounded-md transition-colors cursor-pointer"
+                :style="{
+                  background:
+                    viewMode === 'stats' ? 'var(--bg-elevated)' : 'transparent',
+                  color:
+                    viewMode === 'stats' ? 'var(--text)' : 'var(--text-faint)',
+                  boxShadow:
+                    viewMode === 'stats' ? 'var(--shadow-card)' : 'none',
+                }"
+                title="Estadísticas"
+              >
+                <BarChart3 :size="14" />
+              </button>
+              <button
+                @click="viewMode = 'timeline'"
+                class="p-1.5 rounded-md transition-colors cursor-pointer"
+                :style="{
+                  background:
+                    viewMode === 'timeline'
+                      ? 'var(--bg-elevated)'
+                      : 'transparent',
+                  color:
+                    viewMode === 'timeline'
+                      ? 'var(--text)'
+                      : 'var(--text-faint)',
+                  boxShadow:
+                    viewMode === 'timeline' ? 'var(--shadow-card)' : 'none',
+                }"
+                title="Timeline"
+              >
+                <Clock :size="14" />
+              </button>
             </div>
 
-            <button
-              @click="openAddCategory"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
-              style="color: var(--text-muted); border: 1px dashed var(--border)"
-              @mouseenter="
-                ($event.target as HTMLElement).style.borderColor =
-                  'var(--border-hover)'
-              "
-              @mouseleave="
-                ($event.target as HTMLElement).style.borderColor =
-                  'var(--border)'
-              "
-            >
-              <Plus :size="14" />
-              Nueva categoría
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                @click="showImportModal = true"
+                class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
+                style="
+                  color: var(--text-muted);
+                  border: 1px dashed var(--border);
+                "
+              >
+                Importar
+              </button>
+              <button
+                @click="openAddCategory"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
+                style="
+                  color: var(--text-muted);
+                  border: 1px dashed var(--border);
+                "
+              >
+                <Plus :size="14" />
+                Nueva categoría
+              </button>
+            </div>
           </div>
 
-          <!-- Category columns -->
+          <!-- Content views -->
           <Transition :name="yearTransition" mode="out-in">
-            <div
-              :key="store.activeYear"
-              class="mt-6 grid gap-5"
-              :style="{
-                gridTemplateColumns: `repeat(${store.sortedCategories.length}, minmax(260px, 1fr))`,
-              }"
-            >
-              <CategoryColumn
-                v-for="cat in store.sortedCategories"
-                :key="cat.id"
-                :category="cat"
-                :items="filteredItemsForCategory(cat.id)"
-                :compact="compactView"
-                :highlight-item-id="recentlyAddedItemId"
-                draggable="true"
-                @dragstart="onCategoryDragStart($event, cat.id)"
-                @dragover.prevent="onCategoryDragOver($event, cat.id)"
-                @dragend="onCategoryDragEnd"
-                :class="{ 'opacity-40': draggingCategoryId === cat.id }"
-                @add-item="openAddItem(cat.id)"
-                @edit-item="openDetailItem"
-                @edit-category="openEditCategory(cat)"
-              />
+            <div :key="`${store.activeYear}-${viewMode}`">
+              <!-- Table view (desktop) -->
+              <div v-if="viewMode === 'table'" class="mt-6">
+                <TableView @edit-item="openDetailItem" />
+              </div>
+
+              <!-- Stats view -->
+              <div v-else-if="viewMode === 'stats'" class="mt-6">
+                <ExpandedStats />
+              </div>
+
+              <!-- Timeline view -->
+              <div v-else-if="viewMode === 'timeline'" class="mt-6">
+                <ActivityTimeline @select-item="openDetailItem" />
+              </div>
+
+              <!-- Grid / Compact view -->
+              <div
+                v-else
+                class="mt-6 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                style="grid-auto-rows: min-content"
+              >
+                <CategoryColumn
+                  v-for="cat in filteredCategories"
+                  :key="cat.id"
+                  :category="cat"
+                  :items="filteredItemsForCategory(cat.id)"
+                  :compact="compactView"
+                  :highlight-item-id="recentlyAddedItemId"
+                  :draggable="!isTouchDevice"
+                  @dragstart="onCategoryDragStart($event, cat.id)"
+                  @dragover.prevent="onCategoryDragOver($event, cat.id)"
+                  @dragend="onCategoryDragEnd"
+                  :class="{ 'opacity-40': draggingCategoryId === cat.id }"
+                  @add-item="openAddItem(cat.id)"
+                  @edit-item="openDetailItem"
+                  @edit-category="openEditCategory(cat)"
+                />
+              </div>
             </div>
           </Transition>
 
-          <!-- Stats -->
-          <YearStats class="mt-8" />
+          <!-- Stats bar (always visible in non-stats view) -->
+          <YearStats v-if="viewMode !== 'stats'" class="mt-8" />
         </template>
       </template>
     </main>
@@ -438,90 +667,37 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
       @close="showSettingsModal = false"
     />
 
+    <ImportModal v-if="showImportModal" @close="showImportModal = false" />
+
     <EnrichmentToast />
 
-    <!-- Onboarding overlay -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-300"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition-opacity duration-200"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="showOnboarding"
-          class="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px)"
-          @click.self="dismissOnboarding"
-        >
-          <div
-            class="w-full max-w-sm rounded-2xl p-6 text-center animate-scale-in"
-            style="
-              background: var(--bg-elevated);
-              box-shadow: var(--shadow-modal);
-              border: 1px solid var(--border);
-            "
-          >
-            <div class="text-4xl mb-3">🎬</div>
-            <h2 class="font-display text-xl" style="color: var(--text)">
-              ¡Bienvenido a Cronolog!
-            </h2>
-            <p
-              class="text-sm mt-2 leading-relaxed"
-              style="color: var(--text-muted)"
-            >
-              Empieza añadiendo tu primera película, libro o serie. Haz clic en
-              el botón <strong>+</strong> en cualquier columna de categoría.
-            </p>
-            <div class="flex items-center justify-center gap-1.5 mt-4">
-              <span class="w-2 h-2 rounded-full" style="background: #3b82f6" />
-              <span class="text-[10px]" style="color: var(--text-faint)"
-                >Añade items</span
-              >
-              <span class="mx-1" style="color: var(--border)">→</span>
-              <span class="w-2 h-2 rounded-full" style="background: #f59e0b" />
-              <span class="text-[10px]" style="color: var(--text-faint)"
-                >Se enriquecen automáticamente</span
-              >
-              <span class="mx-1" style="color: var(--border)">→</span>
-              <span class="w-2 h-2 rounded-full" style="background: #22c55e" />
-              <span class="text-[10px]" style="color: var(--text-faint)"
-                >Puntúa y organiza</span
-              >
-            </div>
-            <button
-              @click="dismissOnboarding"
-              class="mt-5 w-full py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
-              style="background: var(--text); color: var(--bg)"
-            >
-              ¡Entendido!
-            </button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- Spotlight search -->
+    <SpotlightSearch
+      v-if="showSpotlight"
+      @close="showSpotlight = false"
+      @select-item="
+        (item) => {
+          showSpotlight = false;
+          openDetailItem(item);
+        }
+      "
+    />
+
+    <!-- Keyboard shortcuts help -->
+    <KeyboardShortcuts v-if="showShortcuts" @close="showShortcuts = false" />
+
+    <!-- Onboarding v2 -->
+    <OnboardingV2 v-if="showOnboarding" @close="dismissOnboarding" />
+
+    <!-- FAB (mobile) -->
+    <FloatingAddButton @add-item="openAddItem" />
+
+    <!-- Mobile bottom nav -->
+    <MobileNav @open-settings="showSettingsModal = true" />
   </div>
 </template>
 
 <style scoped>
-/* Allow horizontal scroll on the grid for mobile */
-@media (max-width: 768px) {
-  .grid {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 8px;
-  }
-  .grid > * {
-    min-width: 280px;
-    scroll-snap-align: start;
-    flex-shrink: 0;
-  }
-}
-
 /* Year slide transitions */
 .slide-left-enter-active,
 .slide-left-leave-active,

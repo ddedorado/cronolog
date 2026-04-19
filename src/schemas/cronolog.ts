@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const fieldTypes = ['text', 'number', 'date', 'rating'] as const
 export type FieldType = (typeof fieldTypes)[number]
 
-export const dataSources = ['none', 'tmdb', 'openlibrary', 'rawg'] as const
+export const dataSources = ['none', 'tmdb', 'openlibrary', 'rawg', 'googlebooks', 'musicbrainz', 'jikan', 'comicvine'] as const
 export type DataSource = (typeof dataSources)[number]
 
 export const categoryFieldSchema = z.object({
@@ -34,6 +34,9 @@ export const enrichmentDataSchema = z.object({
 
 export type EnrichmentData = z.infer<typeof enrichmentDataSchema>
 
+export const itemStatuses = ['backlog', 'in-progress', 'completed'] as const
+export type ItemStatus = (typeof itemStatuses)[number]
+
 export const itemSchema = z.object({
   id: z.string(),
   categoryId: z.string(),
@@ -44,6 +47,10 @@ export const itemSchema = z.object({
   imageUrl: z.string().default(''),
   rating: z.number().min(0).max(5).default(0),
   order: z.number().default(0),
+  status: z.enum(itemStatuses).default('completed'),
+  favorite: z.boolean().default(false),
+  notes: z.string().default(''),
+  tags: z.array(z.string()).default([]),
   customFields: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
   enrichmentData: enrichmentDataSchema.nullable().default(null),
   createdAt: z.string(),
@@ -78,7 +85,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
       { id: 'autor', name: 'Autor', type: 'text', required: false },
     ],
     order: 1,
-    dataSource: 'openlibrary',
+    dataSource: 'googlebooks',
   },
   {
     id: 'tv',
@@ -101,5 +108,71 @@ export const DEFAULT_CATEGORIES: Category[] = [
     ],
     order: 3,
     dataSource: 'rawg',
+  },
+  {
+    id: 'musica',
+    name: 'Música',
+    icon: 'music',
+    color: '#A855F7',
+    fields: [
+      { id: 'artista', name: 'Artista', type: 'text', required: false },
+    ],
+    order: 4,
+    dataSource: 'musicbrainz',
+  },
+  {
+    id: 'anime',
+    name: 'Anime',
+    icon: 'sparkles',
+    color: '#EC4899',
+    fields: [],
+    order: 5,
+    dataSource: 'jikan',
+  },
+  {
+    id: 'manga',
+    name: 'Manga',
+    icon: 'book-marked',
+    color: '#F43F5E',
+    fields: [
+      { id: 'autor', name: 'Autor', type: 'text', required: false },
+    ],
+    order: 6,
+    dataSource: 'jikan',
+  },
+  {
+    id: 'comics',
+    name: 'Cómics',
+    icon: 'zap',
+    color: '#06B6D4',
+    fields: [
+      { id: 'autor', name: 'Autor', type: 'text', required: false },
+    ],
+    order: 7,
+    dataSource: 'comicvine',
+  },
+  {
+    id: 'viajes',
+    name: 'Viajes',
+    icon: 'plane',
+    color: '#14B8A6',
+    fields: [
+      { id: 'destino', name: 'Destino', type: 'text', required: false },
+      { id: 'fecha', name: 'Fecha', type: 'date', required: false },
+    ],
+    order: 8,
+    dataSource: 'none',
+  },
+  {
+    id: 'eventos',
+    name: 'Eventos',
+    icon: 'calendar',
+    color: '#8B5CF6',
+    fields: [
+      { id: 'lugar', name: 'Lugar', type: 'text', required: false },
+      { id: 'fecha', name: 'Fecha', type: 'date', required: false },
+    ],
+    order: 9,
+    dataSource: 'none',
   },
 ]

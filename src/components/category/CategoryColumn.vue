@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import type { Category, Item } from "@/schemas/cronolog";
 import { useCronologStore } from "@/stores/cronolog";
+import { useSwipeActions } from "@/composables/useSwipeActions";
 import ItemCard from "@/components/item/ItemCard.vue";
 import DynamicIcon from "@/components/DynamicIcon.vue";
-import { Plus, Settings, GripVertical, ArrowUpDown } from "lucide-vue-next";
-import { ref, computed } from "vue";
+import {
+  Plus,
+  Settings,
+  GripVertical,
+  ArrowUpDown,
+  Pencil,
+  Trash2,
+} from "lucide-vue-next";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSortable } from "@/composables/useSortable";
 
 const props = defineProps<{
@@ -21,11 +29,33 @@ const emit = defineEmits<{
 }>();
 
 const store = useCronologStore();
+const {
+  swipedItemId,
+  swipeOffset,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
+  resetSwipe,
+} = useSwipeActions();
 const listRef = ref<HTMLElement | null>(null);
 const sortMode = ref<
   "manual" | "rating-desc" | "rating-asc" | "date-desc" | "date-asc" | "alpha"
 >("manual");
 const showSortMenu = ref(false);
+const sortMenuRef = ref<HTMLElement | null>(null);
+
+// Close sort menu on outside click (mobile-friendly)
+function handleDocClick(e: MouseEvent) {
+  if (
+    showSortMenu.value &&
+    sortMenuRef.value &&
+    !sortMenuRef.value.contains(e.target as Node)
+  ) {
+    showSortMenu.value = false;
+  }
+}
+onMounted(() => document.addEventListener("click", handleDocClick, true));
+onUnmounted(() => document.removeEventListener("click", handleDocClick, true));
 
 const sortedItems = computed(() => {
   const list = [...props.items];
@@ -109,10 +139,10 @@ function getOriginalIndex(itemId: string): number {
         </span>
       </div>
       <div class="flex items-center gap-0.5">
-        <div class="relative">
+        <div class="relative" ref="sortMenuRef">
           <button
             @click="showSortMenu = !showSortMenu"
-            class="p-1 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+            class="p-1 rounded-md transition-colors cursor-pointer sm:opacity-0 sm:group-hover:opacity-100"
             :style="{
               color:
                 sortMode !== 'manual' ? category.color : 'var(--text-faint)',
@@ -137,7 +167,6 @@ function getOriginalIndex(itemId: string): number {
                 border: 1px solid var(--border);
                 box-shadow: var(--shadow-card-hover);
               "
-              @mouseleave="showSortMenu = false"
             >
               <button
                 v-for="opt in [
@@ -171,7 +200,7 @@ function getOriginalIndex(itemId: string): number {
         </div>
         <button
           @click="emit('editCategory')"
-          class="p-1 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+          class="p-1 rounded-md transition-colors cursor-pointer sm:opacity-0 sm:group-hover:opacity-100"
           style="color: var(--text-faint)"
           title="Editar categoría"
         >
@@ -217,7 +246,7 @@ function getOriginalIndex(itemId: string): number {
         <div class="flex items-stretch gap-0">
           <!-- Drag handle -->
           <div
-            class="flex items-center justify-center w-6 flex-shrink-0 cursor-grab rounded-l-lg opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity touch-none select-none"
+            class="flex items-center justify-center w-6 flex-shrink-0 cursor-grab rounded-l-lg opacity-40 sm:opacity-0 sm:group-hover:opacity-40 hover:!opacity-100 transition-opacity touch-none select-none"
             :class="{
               '!opacity-60 cursor-grabbing':
                 isDragging && getOriginalIndex(item.id) === dragIndex,
@@ -228,50 +257,87 @@ function getOriginalIndex(itemId: string): number {
             <GripVertical :size="14" />
           </div>
 
-          <!-- Card -->
-          <div class="flex-1 min-w-0" @click="emit('editItem', item)">
-            <!-- Compact view -->
+          <!-- Swipe wrapper (mobile) -->
+          <div
+            class="flex-1 min-w-0 relative overflow-hidden sm:overflow-visible"
+          >
+            <!-- Swipe action buttons behind -->
             <div
-              v-if="compact"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors"
-              style="background: var(--bg-elevated)"
-              @mouseenter="
-                ($event.currentTarget as HTMLElement).style.background =
-                  'var(--bg-muted)'
-              "
-              @mouseleave="
-                ($event.currentTarget as HTMLElement).style.background =
-                  'var(--bg-elevated)'
-              "
+              v-if="swipedItemId === item.id"
+              class="absolute right-0 top-0 bottom-0 flex items-stretch z-10"
             >
-              <span
-                class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                :style="{ background: category.color }"
-              />
-              <span
-                class="text-xs truncate flex-1"
-                style="color: var(--text)"
-                :title="item.title"
+              <button
+                @click.stop="
+                  resetSwipe();
+                  emit('editItem', item);
+                "
+                class="w-20 flex items-center justify-center cursor-pointer"
+                :style="{ background: props.category.color }"
               >
-                {{ item.title }}
-              </span>
-              <span
-                v-if="item.releaseYear"
-                class="text-[10px] font-mono flex-shrink-0"
-                style="color: var(--text-faint)"
+                <Pencil :size="16" style="color: white" />
+              </button>
+              <button
+                @click.stop="
+                  resetSwipe();
+                  store.removeItemWithUndo(item.id);
+                "
+                class="w-20 flex items-center justify-center cursor-pointer"
+                style="background: var(--danger)"
               >
-                {{ item.releaseYear }}
-              </span>
-              <span
-                v-if="item.rating && item.rating > 0"
-                class="text-[10px] flex-shrink-0"
-                style="color: var(--star)"
-              >
-                ★ {{ item.rating }}
-              </span>
+                <Trash2 :size="16" style="color: white" />
+              </button>
             </div>
-            <!-- Full view -->
-            <ItemCard v-else :item="item" :category="category" />
+
+            <!-- Card content with swipe transform -->
+            <div
+              :style="{
+                transform:
+                  swipedItemId === item.id
+                    ? `translateX(${swipeOffset}px)`
+                    : 'none',
+                transition:
+                  swipedItemId === item.id ? 'none' : 'transform 0.2s ease-out',
+              }"
+              @touchstart="onTouchStart($event, item.id)"
+              @touchmove="onTouchMove($event)"
+              @touchend="onTouchEnd()"
+              @click="emit('editItem', item)"
+            >
+              <!-- Compact view -->
+              <div
+                v-if="compact"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors compact-item"
+                style="background: var(--bg-elevated)"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  :style="{ background: category.color }"
+                />
+                <span
+                  class="text-xs truncate flex-1"
+                  style="color: var(--text)"
+                  :title="item.title"
+                >
+                  {{ item.title }}
+                </span>
+                <span
+                  v-if="item.releaseYear"
+                  class="text-[10px] font-mono flex-shrink-0"
+                  style="color: var(--text-faint)"
+                >
+                  {{ item.releaseYear }}
+                </span>
+                <span
+                  v-if="item.rating && item.rating > 0"
+                  class="text-[10px] flex-shrink-0"
+                  style="color: var(--star)"
+                >
+                  ★ {{ item.rating }}
+                </span>
+              </div>
+              <!-- Full view -->
+              <ItemCard v-else :item="item" :category="category" />
+            </div>
           </div>
         </div>
       </div>
@@ -279,16 +345,9 @@ function getOriginalIndex(itemId: string): number {
       <!-- Add button -->
       <button
         @click="emit('addItem')"
-        class="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer mt-auto"
+        class="add-item-btn flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs transition-all duration-200 cursor-pointer mt-auto"
         style="color: var(--text-faint); border: 1px dashed var(--border)"
-        @mouseenter="
-          ($event.target as HTMLElement).style.borderColor = category.color;
-          ($event.target as HTMLElement).style.color = category.color;
-        "
-        @mouseleave="
-          ($event.target as HTMLElement).style.borderColor = 'var(--border)';
-          ($event.target as HTMLElement).style.color = 'var(--text-faint)';
-        "
+        :data-color="category.color"
       >
         <Plus :size="14" />
         Añadir
@@ -296,3 +355,22 @@ function getOriginalIndex(itemId: string): number {
     </div>
   </div>
 </template>
+
+<style scoped>
+@media (hover: hover) {
+  .compact-item:hover {
+    background: var(--bg-muted) !important;
+  }
+  .add-item-btn:hover {
+    border-color: var(--text-muted) !important;
+    color: var(--text-muted) !important;
+  }
+}
+.compact-item:active {
+  background: var(--bg-muted) !important;
+}
+.add-item-btn:active {
+  border-color: var(--text-muted) !important;
+  color: var(--text-muted) !important;
+}
+</style>

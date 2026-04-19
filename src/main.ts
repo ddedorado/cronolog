@@ -6,6 +6,7 @@ import router from './router'
 import { useCronologStore } from './stores/cronolog'
 import { useAuth } from './composables/useAuth'
 import { useSupabaseSync } from './composables/useSupabaseSync'
+import { scheduleWeeklyReminder, requestNotificationPermission } from './services/notifications'
 import './assets/main.css'
 
 const pinia = createPinia()
@@ -38,6 +39,9 @@ async function bootstrap() {
     } catch {
       // Ignore if localStorage is unavailable
     }
+
+    // Schedule PWA push notification reminder
+    requestNotificationPermission().then(() => scheduleWeeklyReminder())
   }
 
   appLoading.value = false

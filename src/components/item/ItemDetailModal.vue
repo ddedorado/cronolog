@@ -2,8 +2,18 @@
 import type { Item, Category } from "@/schemas/cronolog";
 import { formatDate } from "@/utils/helpers";
 import { useSettingsStore } from "@/stores/settings";
+import { useCronologStore } from "@/stores/cronolog";
 import { useEnrichmentQueue } from "@/composables/useEnrichmentQueue";
-import { X, Pencil, Sparkles, Calendar, Tag, Loader2 } from "lucide-vue-next";
+import {
+  X,
+  Pencil,
+  Sparkles,
+  Calendar,
+  Tag,
+  Loader2,
+  Heart,
+  StickyNote,
+} from "lucide-vue-next";
 import StarRating from "@/components/StarRating.vue";
 import { ref, computed } from "vue";
 
@@ -18,6 +28,7 @@ const emit = defineEmits<{
 }>();
 
 const settings = useSettingsStore();
+const store = useCronologStore();
 const { enqueueItem, queue } = useEnrichmentQueue();
 
 const imgError = ref(false);
@@ -74,6 +85,10 @@ const extraEntries = computed(() => {
 
 function handleEnrich() {
   enqueueItem(props.item, props.category);
+}
+
+function toggleFavorite() {
+  store.updateItem(props.item.id, { favorite: !props.item.favorite });
 }
 
 function handleBackdropClick(e: MouseEvent) {
@@ -167,9 +182,42 @@ function handleBackdropClick(e: MouseEvent) {
           </span>
         </div>
 
-        <!-- Rating -->
-        <div v-if="item.rating && item.rating > 0" class="mt-3">
-          <StarRating :model-value="item.rating" :readonly="true" :size="18" />
+        <!-- Rating + Favorite -->
+        <div class="flex items-center gap-3 mt-3">
+          <div v-if="item.rating && item.rating > 0" class="flex-1">
+            <StarRating
+              :model-value="item.rating"
+              :readonly="true"
+              :size="18"
+            />
+          </div>
+          <button
+            @click="toggleFavorite"
+            class="p-1.5 rounded-lg cursor-pointer transition-colors"
+            :style="{
+              background: item.favorite ? '#ef444415' : 'var(--bg-muted)',
+              color: item.favorite ? '#ef4444' : 'var(--text-faint)',
+            }"
+            :title="
+              item.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'
+            "
+          >
+            <Heart :size="16" :fill="item.favorite ? 'currentColor' : 'none'" />
+          </button>
+        </div>
+
+        <!-- Status badge -->
+        <div v-if="item.status && item.status !== 'completed'" class="mt-2">
+          <span
+            class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+            :style="{
+              background:
+                item.status === 'in-progress' ? '#f59e0b15' : '#6366f115',
+              color: item.status === 'in-progress' ? '#f59e0b' : '#6366f1',
+            }"
+          >
+            {{ item.status === "in-progress" ? "En progreso" : "Pendiente" }}
+          </span>
         </div>
 
         <!-- Consumed date -->
@@ -267,6 +315,44 @@ function handleBackdropClick(e: MouseEvent) {
             <Sparkles v-else :size="13" />
             {{ isEnriching ? "Enriqueciendo..." : "Enriquecer" }}
           </button>
+        </div>
+
+        <!-- Notes -->
+        <div
+          v-if="item.notes"
+          class="mt-4 p-3 rounded-lg"
+          style="background: var(--bg-muted); border: 1px solid var(--border)"
+        >
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <StickyNote :size="12" style="color: var(--text-faint)" />
+            <span
+              class="text-[10px] uppercase tracking-wider"
+              style="color: var(--text-faint)"
+              >Notas</span
+            >
+          </div>
+          <p
+            class="text-xs leading-relaxed whitespace-pre-wrap"
+            style="color: var(--text-muted)"
+          >
+            {{ item.notes }}
+          </p>
+        </div>
+
+        <!-- Tags -->
+        <div v-if="item.tags?.length" class="flex flex-wrap gap-1.5 mt-3">
+          <span
+            v-for="tag in item.tags"
+            :key="tag"
+            class="text-[10px] px-2 py-0.5 rounded-full"
+            style="
+              background: var(--bg-muted);
+              color: var(--text-muted);
+              border: 1px solid var(--border);
+            "
+          >
+            #{{ tag }}
+          </span>
         </div>
 
         <!-- Actions -->

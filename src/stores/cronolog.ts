@@ -214,8 +214,12 @@ export const useCronologStore = defineStore(
       const sourceMap: Record<string, string> = {
         peliculas: 'tmdb',
         tv: 'tmdb',
-        libros: 'openlibrary',
+        libros: 'googlebooks',
         juegos: 'rawg',
+        musica: 'musicbrainz',
+        anime: 'jikan',
+        manga: 'jikan',
+        comics: 'comicvine',
       }
       let catChanged = false
       const newCats = categories.value.map((c) => {
@@ -243,6 +247,36 @@ export const useCronologStore = defineStore(
           ],
         }
         categories.value = categories.value.map((c) => c.id === 'libros' ? updated : c)
+      }
+
+      // Migrate Libros from openlibrary to googlebooks
+      if (libros && libros.dataSource === ('openlibrary' as any)) {
+        categories.value = categories.value.map((c) =>
+          c.id === 'libros' ? { ...c, dataSource: 'googlebooks' as const } : c,
+        )
+      }
+
+      // Add new default categories if missing (for existing users)
+      const existingIds = new Set(categories.value.map((c) => c.id))
+      const newDefaults = DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id))
+      if (newDefaults.length > 0) {
+        const maxOrder = Math.max(...categories.value.map((c) => c.order), -1)
+        const toAdd = newDefaults.map((c, i) => ({ ...c, order: maxOrder + 1 + i }))
+        categories.value = [...categories.value, ...toAdd]
+      }
+
+      // Migrate items: add new fields if missing
+      let itemMigrated = false
+      const migratedItems = items.value.map((item) => {
+        const updates: Partial<typeof item> = {}
+        if (item.status === undefined) { updates.status = 'completed'; itemMigrated = true }
+        if (item.favorite === undefined) { updates.favorite = false; itemMigrated = true }
+        if (item.notes === undefined) { updates.notes = ''; itemMigrated = true }
+        if (item.tags === undefined) { updates.tags = []; itemMigrated = true }
+        return Object.keys(updates).length > 0 ? { ...item, ...updates } : item
+      })
+      if (itemMigrated) {
+        items.value = migratedItems
       }
     }
 

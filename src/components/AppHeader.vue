@@ -137,7 +137,7 @@ function onFileSelected(e: Event) {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-0.5 sm:gap-1">
         <!-- Search -->
         <div class="flex items-center">
           <div
@@ -153,7 +153,7 @@ function onFileSelected(e: Event) {
               @keydown.escape="toggleSearch"
               type="text"
               placeholder="Buscar..."
-              class="w-44 px-3 py-1.5 pr-7 rounded-lg text-sm outline-none transition-all"
+              class="w-32 sm:w-44 px-3 py-1.5 pr-7 rounded-lg text-sm outline-none transition-all"
               style="
                 background: var(--bg-muted);
                 color: var(--text);
@@ -184,7 +184,7 @@ function onFileSelected(e: Event) {
 
         <button
           @click="handleExport"
-          class="p-2 rounded-lg transition-colors cursor-pointer"
+          class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
           style="color: var(--text-muted)"
           title="Exportar datos"
         >
@@ -193,7 +193,7 @@ function onFileSelected(e: Event) {
 
         <button
           @click="handleImport"
-          class="p-2 rounded-lg transition-colors cursor-pointer"
+          class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
           style="color: var(--text-muted)"
           title="Importar datos"
         >
@@ -218,7 +218,7 @@ function onFileSelected(e: Event) {
 
         <button
           @click="emit('toggleDark')"
-          class="p-2 rounded-lg transition-colors cursor-pointer"
+          class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
           style="color: var(--text-muted)"
           title="Cambiar tema"
         >
@@ -227,7 +227,7 @@ function onFileSelected(e: Event) {
         </button>
 
         <!-- Sync status -->
-        <div class="p-2 rounded-lg" :title="syncTooltip">
+        <div class="p-2 rounded-lg hidden sm:flex" :title="syncTooltip">
           <WifiOff
             v-if="!isOnline"
             :size="15"
@@ -260,7 +260,7 @@ function onFileSelected(e: Event) {
           <!-- Avatar (links to profile) -->
           <router-link
             to="/profile"
-            class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 hidden sm:flex cursor-pointer transition-colors"
+            class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 cursor-pointer transition-colors"
             style="
               background: var(--bg-muted);
               color: var(--text-muted);
@@ -279,7 +279,7 @@ function onFileSelected(e: Event) {
           </span>
           <button
             @click="handleSignOut"
-            class="p-2 rounded-lg transition-colors cursor-pointer"
+            class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
             style="color: var(--text-muted)"
             title="Cerrar sesión"
           >

@@ -30,20 +30,12 @@ const visibleCustomFields = computed(() => {
 
 <template>
   <div
-    class="group relative rounded-lg cursor-pointer transition-all duration-200 overflow-hidden"
+    class="item-card group relative rounded-lg cursor-pointer transition-all duration-200 overflow-hidden"
     :style="{
       background: 'var(--bg-elevated)',
       boxShadow: 'var(--shadow-card)',
       borderLeft: `3px solid ${category.color}`,
     }"
-    @mouseenter="
-      ($event.currentTarget as HTMLElement).style.boxShadow =
-        'var(--shadow-card-hover)'
-    "
-    @mouseleave="
-      ($event.currentTarget as HTMLElement).style.boxShadow =
-        'var(--shadow-card)'
-    "
   >
     <div class="flex gap-3 p-3">
       <!-- Image (left thumbnail) -->
@@ -151,3 +143,14 @@ const visibleCustomFields = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@media (hover: hover) {
+  .item-card:hover {
+    box-shadow: var(--shadow-card-hover) !important;
+  }
+}
+.item-card:active {
+  box-shadow: var(--shadow-card-hover) !important;
+}
+</style>

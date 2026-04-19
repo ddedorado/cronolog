@@ -101,7 +101,7 @@ async function handleSignOut() {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--bg)">
+  <div class="min-h-screen pb-20 sm:pb-0" style="background: var(--bg)">
     <!-- Header -->
     <header
       class="sticky top-0 z-40 backdrop-blur-md"
