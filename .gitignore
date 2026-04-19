@@ -1,0 +1,29 @@
+# Dependencies
+node_modules
+
+# Build
+dist
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE
+.DS_Store
+.fleet
+.idea
+.vscode
+*.sw?
+
+# Claude skills (private)
+.claude/

@@ -1,0 +1,548 @@
+<script setup lang="ts">
+import { useCronologStore } from "@/stores/cronolog";
+import { useSettingsStore } from "@/stores/settings";
+import { useTheme } from "@/composables/useTheme";
+import { useEnrichmentQueue } from "@/composables/useEnrichmentQueue";
+import AppHeader from "@/components/AppHeader.vue";
+import YearSelector from "@/components/year/YearSelector.vue";
+import CategoryColumn from "@/components/category/CategoryColumn.vue";
+import YearStats from "@/components/stats/YearStats.vue";
+import EnrichmentToast from "@/components/EnrichmentToast.vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  watch,
+  defineAsyncComponent,
+} from "vue";
+import type { Item, Category } from "@/schemas/cronolog";
+import {
+  Plus,
+  CalendarPlus,
+  FolderPlus,
+  LayoutGrid,
+  List,
+} from "lucide-vue-next";
+
+// Lazy-load modals (not needed until user interaction)
+const ItemFormModal = defineAsyncComponent(
+  () => import("@/components/item/ItemFormModal.vue"),
+);
+const ItemDetailModal = defineAsyncComponent(
+  () => import("@/components/item/ItemDetailModal.vue"),
+);
+const CategoryFormModal = defineAsyncComponent(
+  () => import("@/components/category/CategoryFormModal.vue"),
+);
+const SettingsModal = defineAsyncComponent(
+  () => import("@/components/SettingsModal.vue"),
+);
+
+const store = useCronologStore();
+const settingsStore = useSettingsStore();
+const { isDark, toggleDark } = useTheme();
+const { enqueueItem } = useEnrichmentQueue();
+
+// Search
+const searchQuery = ref("");
+
+// View mode
+const compactView = ref(false);
+
+// Onboarding
+const showOnboarding = ref(false);
+
+function checkOnboarding() {
+  const hasItems = store.items.length > 0;
+  const dismissed = localStorage.getItem("cronolog_onboarding_done");
+  if (!hasItems && !dismissed && store.hasYears) {
+    showOnboarding.value = true;
+  }
+}
+
+function dismissOnboarding() {
+  showOnboarding.value = false;
+  localStorage.setItem("cronolog_onboarding_done", "1");
+}
+
+// Year transition direction
+const yearTransition = ref("slide-right");
+const previousYear = ref(store.activeYear);
+watch(
+  () => store.activeYear,
+  (newYear, oldYear) => {
+    yearTransition.value = newYear > oldYear ? "slide-left" : "slide-right";
+    previousYear.value = newYear;
+  },
+);
+
+function filteredItemsForCategory(categoryId: string) {
+  const items = store.itemsForCategory(categoryId);
+  if (!searchQuery.value.trim()) return items;
+  const q = searchQuery.value.trim().toLowerCase();
+  return items.filter(
+    (i) =>
+      i.title.toLowerCase().includes(q) ||
+      (i.releaseYear && String(i.releaseYear).includes(q)) ||
+      Object.values(i.customFields).some((v) =>
+        String(v).toLowerCase().includes(q),
+      ),
+  );
+}
+
+// Item modal state
+const showItemModal = ref(false);
+const editingItem = ref<Item | null>(null);
+const preselectedCategoryId = ref<string | null>(null);
+const itemModalKey = ref(0);
+const recentlyAddedItemId = ref<string | null>(null);
+
+// Detail modal state
+const showDetailModal = ref(false);
+const detailItemId = ref<string | null>(null);
+const detailItem = computed(() =>
+  detailItemId.value
+    ? (store.items.find((i) => i.id === detailItemId.value) ?? null)
+    : null,
+);
+const detailCategory = computed(() =>
+  detailItem.value
+    ? (store.categories.find((c) => c.id === detailItem.value!.categoryId) ??
+      null)
+    : null,
+);
+
+// Settings modal
+const showSettingsModal = ref(false);
+
+function openAddItem(categoryId: string) {
+  preselectedCategoryId.value = categoryId;
+  editingItem.value = null;
+  itemModalKey.value++;
+  showItemModal.value = true;
+}
+
+function openEditItem(item: Item) {
+  preselectedCategoryId.value = item.categoryId;
+  editingItem.value = { ...item };
+  itemModalKey.value++;
+  showItemModal.value = true;
+}
+
+function openDetailItem(item: Item) {
+  const category = store.categories.find((c) => c.id === item.categoryId);
+  if (!category) return;
+  detailItemId.value = item.id;
+  showDetailModal.value = true;
+}
+
+function onDetailEdit() {
+  if (detailItem.value) {
+    showDetailModal.value = false;
+    openEditItem(detailItem.value);
+  }
+}
+
+function onItemModalClose() {
+  showItemModal.value = false;
+
+  // Auto-enrich newly created items
+  if (!editingItem.value && settingsStore.autoEnrich) {
+    const cat = store.categories.find(
+      (c) => c.id === preselectedCategoryId.value,
+    );
+    if (
+      cat &&
+      cat.dataSource !== "none" &&
+      settingsStore.hasKeyForSource(cat.dataSource)
+    ) {
+      const items = store.itemsForCategory(cat.id);
+      const latest = [...items].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      )[0];
+      if (latest && !latest.enrichmentData) {
+        enqueueItem(latest, cat);
+      }
+    }
+  }
+
+  // Track recently added for pop animation
+  if (!editingItem.value) {
+    const items = store.itemsForCategory(preselectedCategoryId.value ?? "");
+    const latest = [...items].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    )[0];
+    if (latest) {
+      recentlyAddedItemId.value = latest.id;
+      setTimeout(() => {
+        recentlyAddedItemId.value = null;
+      }, 500);
+    }
+  }
+}
+
+// Category modal state
+const showCategoryModal = ref(false);
+const editingCategory = ref<Category | null>(null);
+const categoryModalKey = ref(0);
+
+// Category drag reorder
+const draggingCategoryId = ref<string | null>(null);
+
+function onCategoryDragStart(e: DragEvent, categoryId: string) {
+  draggingCategoryId.value = categoryId;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+  }
+}
+
+function onCategoryDragOver(e: DragEvent, targetId: string) {
+  if (!draggingCategoryId.value || draggingCategoryId.value === targetId)
+    return;
+  const ids = store.sortedCategories.map((c) => c.id);
+  const fromIdx = ids.indexOf(draggingCategoryId.value);
+  const toIdx = ids.indexOf(targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const newIds = [...ids];
+  newIds.splice(fromIdx, 1);
+  newIds.splice(toIdx, 0, draggingCategoryId.value);
+  store.reorderCategories(newIds);
+}
+
+function onCategoryDragEnd() {
+  draggingCategoryId.value = null;
+}
+
+function openAddCategory() {
+  editingCategory.value = null;
+  categoryModalKey.value++;
+  showCategoryModal.value = true;
+}
+
+function openEditCategory(category: Category) {
+  editingCategory.value = { ...category, fields: [...category.fields] };
+  categoryModalKey.value++;
+  showCategoryModal.value = true;
+}
+
+// Keyboard shortcuts
+function handleKeyboard(e: KeyboardEvent) {
+  // Don't trigger when typing in inputs
+  const tag = (e.target as HTMLElement).tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  // Don't trigger when any modal is open
+  if (
+    showItemModal.value ||
+    showDetailModal.value ||
+    showCategoryModal.value ||
+    showSettingsModal.value
+  )
+    return;
+
+  if (e.key === "ArrowLeft") {
+    const years = store.availableYears;
+    const idx = years.indexOf(store.activeYear);
+    if (idx > 0) store.setActiveYear(years[idx - 1]);
+  } else if (e.key === "ArrowRight") {
+    const years = store.availableYears;
+    const idx = years.indexOf(store.activeYear);
+    if (idx < years.length - 1) store.setActiveYear(years[idx + 1]);
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("keydown", handleKeyboard);
+  checkOnboarding();
+});
+onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
+</script>
+
+<template>
+  <div class="min-h-screen" style="background: var(--bg)">
+    <AppHeader
+      :is-dark="isDark"
+      v-model:search="searchQuery"
+      @toggle-dark="toggleDark()"
+      @open-settings="showSettingsModal = true"
+    />
+
+    <main class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <!-- Empty state: no years -->
+      <div
+        v-if="!store.hasYears"
+        class="mt-20 flex flex-col items-center justify-center text-center animate-fade-in"
+      >
+        <CalendarPlus :size="48" style="color: var(--text-faint)" />
+        <h2 class="font-display text-2xl mt-4" style="color: var(--text)">
+          Empieza añadiendo un año
+        </h2>
+        <p class="text-sm mt-2 max-w-xs" style="color: var(--text-muted)">
+          Añade el año que quieras registrar para comenzar a llevar tu cronolog.
+        </p>
+        <div class="mt-6">
+          <YearSelector />
+        </div>
+      </div>
+
+      <!-- Has years -->
+      <template v-else>
+        <YearSelector />
+
+        <!-- Empty state: no categories -->
+        <div
+          v-if="store.sortedCategories.length === 0"
+          class="mt-16 flex flex-col items-center justify-center text-center animate-fade-in"
+        >
+          <FolderPlus :size="48" style="color: var(--text-faint)" />
+          <h2 class="font-display text-2xl mt-4" style="color: var(--text)">
+            Añade tu primera categoría
+          </h2>
+          <p class="text-sm mt-2 max-w-xs" style="color: var(--text-muted)">
+            Crea categorías como Películas, Libros, Juegos… para organizar tu
+            consumo.
+          </p>
+          <button
+            @click="openAddCategory"
+            class="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
+            style="background: var(--text); color: var(--bg)"
+          >
+            <Plus :size="16" />
+            Nueva categoría
+          </button>
+        </div>
+
+        <!-- Has categories -->
+        <template v-else>
+          <!-- Add category (top) -->
+          <div class="mt-4 flex items-center justify-between">
+            <!-- View toggle -->
+            <div
+              class="flex items-center gap-0.5 p-0.5 rounded-lg"
+              style="
+                background: var(--bg-muted);
+                border: 1px solid var(--border);
+              "
+            >
+              <button
+                @click="compactView = false"
+                class="p-1.5 rounded-md transition-colors cursor-pointer"
+                :style="{
+                  background: !compactView
+                    ? 'var(--bg-elevated)'
+                    : 'transparent',
+                  color: !compactView ? 'var(--text)' : 'var(--text-faint)',
+                  boxShadow: !compactView ? 'var(--shadow-card)' : 'none',
+                }"
+                title="Vista detallada"
+              >
+                <LayoutGrid :size="14" />
+              </button>
+              <button
+                @click="compactView = true"
+                class="p-1.5 rounded-md transition-colors cursor-pointer"
+                :style="{
+                  background: compactView
+                    ? 'var(--bg-elevated)'
+                    : 'transparent',
+                  color: compactView ? 'var(--text)' : 'var(--text-faint)',
+                  boxShadow: compactView ? 'var(--shadow-card)' : 'none',
+                }"
+                title="Vista compacta"
+              >
+                <List :size="14" />
+              </button>
+            </div>
+
+            <button
+              @click="openAddCategory"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
+              style="color: var(--text-muted); border: 1px dashed var(--border)"
+              @mouseenter="
+                ($event.target as HTMLElement).style.borderColor =
+                  'var(--border-hover)'
+              "
+              @mouseleave="
+                ($event.target as HTMLElement).style.borderColor =
+                  'var(--border)'
+              "
+            >
+              <Plus :size="14" />
+              Nueva categoría
+            </button>
+          </div>
+
+          <!-- Category columns -->
+          <Transition :name="yearTransition" mode="out-in">
+            <div
+              :key="store.activeYear"
+              class="mt-6 grid gap-5"
+              :style="{
+                gridTemplateColumns: `repeat(${store.sortedCategories.length}, minmax(260px, 1fr))`,
+              }"
+            >
+              <CategoryColumn
+                v-for="cat in store.sortedCategories"
+                :key="cat.id"
+                :category="cat"
+                :items="filteredItemsForCategory(cat.id)"
+                :compact="compactView"
+                :highlight-item-id="recentlyAddedItemId"
+                draggable="true"
+                @dragstart="onCategoryDragStart($event, cat.id)"
+                @dragover.prevent="onCategoryDragOver($event, cat.id)"
+                @dragend="onCategoryDragEnd"
+                :class="{ 'opacity-40': draggingCategoryId === cat.id }"
+                @add-item="openAddItem(cat.id)"
+                @edit-item="openDetailItem"
+                @edit-category="openEditCategory(cat)"
+              />
+            </div>
+          </Transition>
+
+          <!-- Stats -->
+          <YearStats class="mt-8" />
+        </template>
+      </template>
+    </main>
+
+    <!-- Modals -->
+    <ItemFormModal
+      v-if="showItemModal"
+      :key="itemModalKey"
+      :item="editingItem"
+      :category-id="preselectedCategoryId"
+      @close="onItemModalClose"
+    />
+
+    <ItemDetailModal
+      v-if="showDetailModal && detailItem && detailCategory"
+      :item="detailItem"
+      :category="detailCategory"
+      @close="
+        showDetailModal = false;
+        detailItemId = null;
+      "
+      @edit="onDetailEdit"
+    />
+
+    <CategoryFormModal
+      v-if="showCategoryModal"
+      :key="categoryModalKey"
+      :category="editingCategory"
+      @close="showCategoryModal = false"
+    />
+
+    <SettingsModal
+      v-if="showSettingsModal"
+      @close="showSettingsModal = false"
+    />
+
+    <EnrichmentToast />
+
+    <!-- Onboarding overlay -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-300"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-200"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showOnboarding"
+          class="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px)"
+          @click.self="dismissOnboarding"
+        >
+          <div
+            class="w-full max-w-sm rounded-2xl p-6 text-center animate-scale-in"
+            style="
+              background: var(--bg-elevated);
+              box-shadow: var(--shadow-modal);
+              border: 1px solid var(--border);
+            "
+          >
+            <div class="text-4xl mb-3">🎬</div>
+            <h2 class="font-display text-xl" style="color: var(--text)">
+              ¡Bienvenido a Cronolog!
+            </h2>
+            <p
+              class="text-sm mt-2 leading-relaxed"
+              style="color: var(--text-muted)"
+            >
+              Empieza añadiendo tu primera película, libro o serie. Haz clic en
+              el botón <strong>+</strong> en cualquier columna de categoría.
+            </p>
+            <div class="flex items-center justify-center gap-1.5 mt-4">
+              <span class="w-2 h-2 rounded-full" style="background: #3b82f6" />
+              <span class="text-[10px]" style="color: var(--text-faint)"
+                >Añade items</span
+              >
+              <span class="mx-1" style="color: var(--border)">→</span>
+              <span class="w-2 h-2 rounded-full" style="background: #f59e0b" />
+              <span class="text-[10px]" style="color: var(--text-faint)"
+                >Se enriquecen automáticamente</span
+              >
+              <span class="mx-1" style="color: var(--border)">→</span>
+              <span class="w-2 h-2 rounded-full" style="background: #22c55e" />
+              <span class="text-[10px]" style="color: var(--text-faint)"
+                >Puntúa y organiza</span
+              >
+            </div>
+            <button
+              @click="dismissOnboarding"
+              class="mt-5 w-full py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
+              style="background: var(--text); color: var(--bg)"
+            >
+              ¡Entendido!
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
+<style scoped>
+/* Allow horizontal scroll on the grid for mobile */
+@media (max-width: 768px) {
+  .grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+  }
+  .grid > * {
+    min-width: 280px;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+}
+
+/* Year slide transitions */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.25s ease-out;
+}
+.slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+</style>

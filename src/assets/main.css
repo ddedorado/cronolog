@@ -1,0 +1,152 @@
+/* ── Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+/* ── Design Tokens ── */
+:root {
+  --font-display: 'Instrument Serif', serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --bg: #FAFAF8;
+  --bg-elevated: #FFFFFF;
+  --bg-muted: #F5F5F0;
+  --text: #1C1917;
+  --text-muted: #78716C;
+  --text-faint: #A8A29E;
+  --border: #E7E5E4;
+  --border-hover: #D6D3D1;
+
+  --cat-peliculas: #3B82F6;
+  --cat-libros: #22C55E;
+  --cat-tv: #EAB308;
+  --cat-juegos: #F97316;
+
+  --radius: 10px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-modal: 0 24px 80px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08);
+  --danger: #EF4444;
+  --danger-light: #EF444415;
+  --star: #f59e0b;
+}
+
+.dark {
+  --bg: #0C0A09;
+  --bg-elevated: #1C1917;
+  --bg-muted: #292524;
+  --text: #FAFAF9;
+  --text-muted: #A8A29E;
+  --text-faint: #78716C;
+  --border: #292524;
+  --border-hover: #44403C;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
+  --shadow-modal: 0 24px 80px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.3);
+  --danger: #EF4444;
+  --danger-light: #EF444420;
+  --star: #fbbf24;
+}
+
+/* ── Base ── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* ── Utilities ── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Animations ── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out both;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.35s ease-out both;
+}
+
+/* ── Focus ── */
+input:focus, select:focus {
+  border-color: var(--border-hover) !important;
+  outline: none;
+}
+
+/* ── Button hover polish ── */
+button:not(:disabled):hover {
+  filter: brightness(0.97);
+}
+
+.dark button:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.dark ::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
