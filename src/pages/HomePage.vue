@@ -12,7 +12,7 @@ import CategoryColumn from "@/components/category/CategoryColumn.vue";
 import YearStats from "@/components/stats/YearStats.vue";
 import EnrichmentToast from "@/components/EnrichmentToast.vue";
 import SpotlightSearch from "@/components/SpotlightSearch.vue";
-import FloatingAddButton from "@/components/FloatingAddButton.vue";
+// FloatingAddButton removed — user preference
 import CategoryTabs from "@/components/category/CategoryTabs.vue";
 import ExpandedStats from "@/components/stats/ExpandedStats.vue";
 import ActivityTimeline from "@/components/ActivityTimeline.vue";
@@ -137,14 +137,7 @@ watch(
   },
 );
 
-// Filter items by category tab + search
-const filteredCategories = computed(() => {
-  if (!activeCategoryFilter.value) return store.sortedCategories;
-  return store.sortedCategories.filter(
-    (c) => c.id === activeCategoryFilter.value,
-  );
-});
-
+// Filter items by search
 function filteredItemsForCategory(categoryId: string) {
   const items = store.itemsForCategory(categoryId);
   if (!searchQuery.value.trim()) return items;
@@ -158,6 +151,19 @@ function filteredItemsForCategory(categoryId: string) {
       ),
   );
 }
+
+// Filter categories: by tab + hide empty when searching
+const filteredCategories = computed(() => {
+  let cats = store.sortedCategories;
+  if (activeCategoryFilter.value) {
+    cats = cats.filter((c) => c.id === activeCategoryFilter.value);
+  }
+  // When searching, hide categories with no matching items
+  if (searchQuery.value.trim()) {
+    cats = cats.filter((c) => filteredItemsForCategory(c.id).length > 0);
+  }
+  return cats;
+});
 
 // Item modal state
 const showItemModal = ref(false);
@@ -700,9 +706,6 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 
     <!-- Onboarding v2 -->
     <OnboardingV2 v-if="showOnboarding" @close="dismissOnboarding" />
-
-    <!-- FAB (mobile) -->
-    <FloatingAddButton @add-item="openAddItem" />
 
     <!-- Mobile bottom nav -->
     <MobileNav @open-settings="showSettingsModal = true" />

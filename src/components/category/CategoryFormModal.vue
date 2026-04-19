@@ -161,6 +161,7 @@ onMounted(() => nameInput.value?.focus());
       style="
         background: var(--bg-elevated);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        -webkit-overflow-scrolling: touch;
       "
     >
       <!-- Header -->
@@ -270,8 +271,12 @@ onMounted(() => nameInput.value?.focus());
           >
             <option value="none">Ninguna</option>
             <option value="tmdb">TMDB — Películas / TV</option>
-            <option value="openlibrary">Open Library — Libros</option>
+            <option value="googlebooks">Google Books — Libros</option>
             <option value="rawg">RAWG — Videojuegos</option>
+            <option value="musicbrainz">MusicBrainz — Música</option>
+            <option value="jikan">Jikan — Anime / Manga</option>
+            <option value="comicvine">ComicVine — Cómics</option>
+            <option value="openlibrary">Open Library — Libros (alt)</option>
           </select>
           <p class="text-[10px] mt-1" style="color: var(--text-faint)">
             Permite enriquecer automáticamente los elementos con imagen,

@@ -152,6 +152,13 @@ function getOriginalIndex(itemId: string): number {
           >
             <ArrowUpDown :size="13" />
           </button>
+          <!-- Mobile backdrop for sort menu -->
+          <div
+            v-if="showSortMenu"
+            class="sm:hidden fixed inset-0 z-[99]"
+            style="background: rgba(0, 0, 0, 0.3)"
+            @click="showSortMenu = false"
+          />
           <Transition
             enter-active-class="transition-all duration-150"
             enter-from-class="opacity-0 scale-95"
@@ -160,13 +167,6 @@ function getOriginalIndex(itemId: string): number {
             leave-from-class="opacity-100 scale-100"
             leave-to-class="opacity-0 scale-95"
           >
-            <!-- Mobile backdrop for sort menu -->
-            <div
-              v-if="showSortMenu"
-              class="sm:hidden fixed inset-0 z-[99]"
-              style="background: rgba(0, 0, 0, 0.3)"
-              @click="showSortMenu = false"
-            />
             <div
               v-if="showSortMenu"
               class="fixed left-2 right-2 bottom-2 z-[100] sm:absolute sm:right-0 sm:left-auto sm:bottom-auto sm:top-full sm:mt-1 py-1 rounded-lg min-w-[140px]"

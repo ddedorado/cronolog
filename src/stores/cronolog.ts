@@ -10,6 +10,7 @@ export const useCronologStore = defineStore(
     const items = ref<Item[]>([])
     const activeYear = ref(new Date().getFullYear())
     const addedYears = ref<number[]>([])
+    const deletedCategoryIds = ref<string[]>([])
 
     // ── Getters ──
     const sortedCategories = computed(() =>
@@ -128,6 +129,9 @@ export const useCronologStore = defineStore(
     function removeCategory(id: string) {
       categories.value = categories.value.filter((c) => c.id !== id)
       items.value = items.value.filter((i) => i.categoryId !== id)
+      if (!deletedCategoryIds.value.includes(id)) {
+        deletedCategoryIds.value = [...deletedCategoryIds.value, id]
+      }
     }
 
     /** Remove category and return a restore function */
@@ -138,9 +142,13 @@ export const useCronologStore = defineStore(
       const itemSnapshots = items.value.filter((i) => i.categoryId === id).map((i) => ({ ...i }))
       categories.value = categories.value.filter((c) => c.id !== id)
       items.value = items.value.filter((i) => i.categoryId !== id)
+      if (!deletedCategoryIds.value.includes(id)) {
+        deletedCategoryIds.value = [...deletedCategoryIds.value, id]
+      }
       return () => {
         categories.value = [...categories.value, catSnapshot]
         items.value = [...items.value, ...itemSnapshots]
+        deletedCategoryIds.value = deletedCategoryIds.value.filter((d) => d !== id)
       }
     }
 
@@ -256,9 +264,10 @@ export const useCronologStore = defineStore(
         )
       }
 
-      // Add new default categories if missing (for existing users)
+      // Add new default categories if missing (for existing users, skip deleted ones)
       const existingIds = new Set(categories.value.map((c) => c.id))
-      const newDefaults = DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id))
+      const deletedIds = new Set(deletedCategoryIds.value)
+      const newDefaults = DEFAULT_CATEGORIES.filter((c) => !existingIds.has(c.id) && !deletedIds.has(c.id))
       if (newDefaults.length > 0) {
         const maxOrder = Math.max(...categories.value.map((c) => c.order), -1)
         const toAdd = newDefaults.map((c, i) => ({ ...c, order: maxOrder + 1 + i }))
@@ -285,6 +294,7 @@ export const useCronologStore = defineStore(
       items,
       activeYear,
       addedYears,
+      deletedCategoryIds,
       hasYears,
       sortedCategories,
       itemsByYear,
