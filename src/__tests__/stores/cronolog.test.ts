@@ -183,4 +183,37 @@ describe('cronolog store', () => {
     const peliculas = store.categories.find((c) => c.id === 'peliculas')
     expect(peliculas?.dataSource).toBe('tmdb')
   })
+
+  it('removeItemWithUndo removes and restores item', () => {
+    const store = useCronologStore()
+    store.addYear(2026)
+    const item = makeItem({ id: 'undo-test' })
+    store.addItem(item)
+    expect(store.items).toHaveLength(1)
+
+    const restore = store.removeItemWithUndo('undo-test')
+    expect(store.items).toHaveLength(0)
+    expect(restore).not.toBeNull()
+
+    restore!()
+    expect(store.items).toHaveLength(1)
+    expect(store.items[0].id).toBe('undo-test')
+  })
+
+  it('removeCategoryWithUndo removes and restores category with items', () => {
+    const store = useCronologStore()
+    store.addYear(2026)
+    store.addItem(makeItem({ id: 'cat-item', categoryId: 'peliculas' }))
+
+    const initialCatCount = store.categories.length
+    const restore = store.removeCategoryWithUndo('peliculas')
+    expect(store.categories).toHaveLength(initialCatCount - 1)
+    expect(store.items).toHaveLength(0)
+    expect(restore).not.toBeNull()
+
+    restore!()
+    expect(store.categories).toHaveLength(initialCatCount)
+    expect(store.items).toHaveLength(1)
+    expect(store.items[0].id).toBe('cat-item')
+  })
 })

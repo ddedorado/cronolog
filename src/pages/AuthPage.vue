@@ -3,6 +3,8 @@ import { ref, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useSupabaseSync } from "@/composables/useSupabaseSync";
+import { useTheme } from "@/composables/useTheme";
+import { validateInviteCode, isInviteOnly } from "@/utils/invite";
 import {
   LogIn,
   UserPlus,
@@ -18,24 +20,36 @@ import {
   BookOpen,
   Gamepad2,
   Tv,
+  Moon,
+  Sun,
+  Ticket,
 } from "lucide-vue-next";
 
 const router = useRouter();
 const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 const { loadFromCloud, startWatching, migrateLocalData } = useSupabaseSync();
+const { isDark, toggleDark } = useTheme();
 
 const mode = ref<"login" | "register" | "forgot">("login");
 const email = ref("");
 const password = ref("");
 const displayName = ref("");
+const inviteCode = ref("");
 const showPassword = ref(false);
 const loading = ref(false);
 const error = ref("");
 const success = ref("");
 const showConfirmEmail = ref(false);
 
+const requiresInvite = isInviteOnly();
+
 // Inline validation (touched tracking)
-const touched = ref({ email: false, password: false, name: false });
+const touched = ref({
+  email: false,
+  password: false,
+  name: false,
+  invite: false,
+});
 
 const emailValid = computed(() =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()),
@@ -43,6 +57,16 @@ const emailValid = computed(() =>
 const emailError = computed(() => {
   if (!touched.value.email || !email.value.trim()) return "";
   return emailValid.value ? "" : "Email no válido";
+});
+
+const inviteValid = computed(() => {
+  if (!requiresInvite) return true;
+  return validateInviteCode(inviteCode.value);
+});
+const inviteError = computed(() => {
+  if (!requiresInvite || !touched.value.invite || !inviteCode.value.trim())
+    return "";
+  return inviteValid.value ? "" : "Código no válido";
 });
 
 const passwordStrength = computed(() => {
@@ -76,19 +100,29 @@ const isFormValid = computed(() => {
   if (!emailValid.value) return false;
   if (mode.value === "forgot") return true;
   if (!password.value || password.value.length < 6) return false;
-  if (mode.value === "register" && !displayName.value.trim()) return false;
+  if (mode.value === "register") {
+    if (!displayName.value.trim()) return false;
+    if (requiresInvite && !inviteValid.value) return false;
+  }
   return true;
 });
 
 // Reset touched on mode switch
 watch(mode, () => {
-  touched.value = { email: false, password: false, name: false };
+  touched.value = { email: false, password: false, name: false, invite: false };
   error.value = "";
   success.value = "";
 });
 
 async function handleSubmit() {
   if (!isFormValid.value) return;
+
+  // Validate invite code before calling Supabase
+  if (mode.value === "register" && requiresInvite && !inviteValid.value) {
+    error.value = "Código de invitación no válido";
+    return;
+  }
+
   loading.value = true;
   error.value = "";
   success.value = "";
@@ -134,6 +168,16 @@ async function handleSubmit() {
 }
 
 async function handleGoogleLogin() {
+  // In register mode, validate invite code first
+  if (mode.value === "register" && requiresInvite) {
+    if (!inviteValid.value) {
+      touched.value.invite = true;
+      error.value =
+        "Introduce un código de invitación válido antes de continuar con Google.";
+      return;
+    }
+  }
+
   loading.value = true;
   error.value = "";
   try {
@@ -204,6 +248,17 @@ function switchMode(newMode: "login" | "register" | "forgot") {
     </div>
 
     <div class="w-full max-w-sm animate-fade-in relative z-10">
+      <!-- Dark mode toggle (top-right) -->
+      <button
+        @click="toggleDark()"
+        class="absolute -top-10 right-0 p-2 rounded-lg transition-colors cursor-pointer"
+        style="color: var(--text-faint)"
+        title="Cambiar tema"
+      >
+        <Moon v-if="!isDark" :size="16" />
+        <Sun v-else :size="16" />
+      </button>
+
       <!-- Logo -->
       <div class="text-center mb-8">
         <h1
@@ -497,6 +552,58 @@ function switchMode(newMode: "login" | "register" | "forgot") {
                 {{ strengthLabel }}
               </p>
             </div>
+          </div>
+
+          <!-- Invite code (register only, when invite-only mode is active) -->
+          <div v-if="mode === 'register' && requiresInvite">
+            <label
+              class="block text-xs font-medium mb-1.5"
+              style="color: var(--text-muted)"
+            >
+              Código de invitación
+            </label>
+            <div class="relative">
+              <Ticket
+                :size="15"
+                class="absolute left-3 top-1/2 -translate-y-1/2"
+                style="color: var(--text-faint)"
+              />
+              <input
+                v-model="inviteCode"
+                type="text"
+                placeholder="Introduce tu código"
+                autocomplete="off"
+                @blur="touched.invite = true"
+                class="w-full pl-9 pr-9 py-2.5 rounded-lg text-sm outline-none transition-colors uppercase tracking-wider"
+                :style="{
+                  background: 'var(--bg-muted)',
+                  color: 'var(--text)',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: inviteError
+                    ? '#ef4444'
+                    : touched.invite && inviteValid && inviteCode.trim()
+                      ? '#22c55e'
+                      : 'var(--border)',
+                }"
+              />
+              <CheckCircle2
+                v-if="touched.invite && inviteValid && inviteCode.trim()"
+                :size="15"
+                class="absolute right-3 top-1/2 -translate-y-1/2"
+                style="color: #22c55e"
+              />
+            </div>
+            <p
+              v-if="inviteError"
+              class="text-[10px] mt-1"
+              style="color: #ef4444"
+            >
+              {{ inviteError }}
+            </p>
+            <p v-else class="text-[10px] mt-1" style="color: var(--text-faint)">
+              Necesitas un código para crear tu cuenta.
+            </p>
           </div>
 
           <!-- Forgot password link -->
