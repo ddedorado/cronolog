@@ -58,7 +58,10 @@ const KeyboardShortcuts = defineAsyncComponent(
   () => import("@/components/KeyboardShortcuts.vue"),
 );
 const ImportModal = defineAsyncComponent(
-  () => import("@/components/ImportModal.vue"),
+  () => import("@/components/ImportModalV2.vue"),
+);
+const ExportModal = defineAsyncComponent(
+  () => import("@/components/ExportModal.vue"),
 );
 const OnboardingV2 = defineAsyncComponent(
   () => import("@/components/OnboardingV2.vue"),
@@ -87,6 +90,9 @@ const showShortcuts = ref(false);
 
 // Import modal
 const showImportModal = ref(false);
+
+// Export modal
+const showExportModal = ref(false);
 
 // Category filter (mobile tabs)
 const activeCategoryFilter = ref<string | null>(null);
@@ -327,7 +333,8 @@ function handleKeyboard(e: KeyboardEvent) {
     showSettingsModal.value ||
     showSpotlight.value ||
     showShortcuts.value ||
-    showImportModal.value
+    showImportModal.value ||
+    showExportModal.value
   )
     return;
 
@@ -413,6 +420,8 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
       v-model:search="searchQuery"
       @toggle-dark="toggleDark()"
       @open-settings="showSettingsModal = true"
+      @open-export="showExportModal = true"
+      @open-import="showImportModal = true"
     />
 
     <main class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 pb-12">
@@ -668,6 +677,8 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
     />
 
     <ImportModal v-if="showImportModal" @close="showImportModal = false" />
+
+    <ExportModal v-if="showExportModal" @close="showExportModal = false" />
 
     <EnrichmentToast />
 

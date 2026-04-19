@@ -32,6 +32,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleDark: [];
   openSettings: [];
+  openExport: [];
+  openImport: [];
   "update:search": [value: string];
 }>();
 
@@ -39,7 +41,6 @@ const store = useCronologStore();
 const { displayName, signOut } = useAuth();
 const { syncStatus, isOnline } = useSupabaseSync();
 const router = useRouter();
-const fileInput = ref<HTMLInputElement | null>(null);
 const showSearch = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
 
@@ -77,34 +78,11 @@ function toggleSearch() {
 }
 
 function handleExport() {
-  const data = store.exportData();
-  const blob = new Blob([data], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `cronolog-backup-${new Date().toISOString().split("T")[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  emit("openExport");
 }
 
 function handleImport() {
-  fileInput.value?.click();
-}
-
-function onFileSelected(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      store.importData(reader.result as string);
-    } catch {
-      alert("Archivo JSON no válido");
-    }
-  };
-  reader.readAsText(file);
-  input.value = "";
+  emit("openImport");
 }
 </script>
 
@@ -199,13 +177,6 @@ function onFileSelected(e: Event) {
         >
           <Upload :size="18" />
         </button>
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".json"
-          class="hidden"
-          @change="onFileSelected"
-        />
 
         <button
           @click="emit('openSettings')"
