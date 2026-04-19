@@ -112,6 +112,7 @@ function handleBackdropClick(e: MouseEvent) {
       style="
         background: var(--bg-elevated);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        -webkit-overflow-scrolling: touch;
       "
     >
       <!-- Header -->

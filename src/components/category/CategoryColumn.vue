@@ -25,6 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   addItem: [];
   editItem: [item: Item];
+  editItemForm: [item: Item];
   editCategory: [];
 }>();
 
@@ -159,9 +160,16 @@ function getOriginalIndex(itemId: string): number {
             leave-from-class="opacity-100 scale-100"
             leave-to-class="opacity-0 scale-95"
           >
+            <!-- Mobile backdrop for sort menu -->
             <div
               v-if="showSortMenu"
-              class="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg min-w-[140px]"
+              class="sm:hidden fixed inset-0 z-[99]"
+              style="background: rgba(0,0,0,0.3)"
+              @click="showSortMenu = false"
+            />
+            <div
+              v-if="showSortMenu"
+              class="fixed left-2 right-2 bottom-2 z-[100] sm:absolute sm:right-0 sm:left-auto sm:bottom-auto sm:top-full sm:mt-1 py-1 rounded-lg min-w-[140px]"
               style="
                 background: var(--bg-elevated);
                 border: 1px solid var(--border);
@@ -182,7 +190,7 @@ function getOriginalIndex(itemId: string): number {
                   sortMode = opt.key as any;
                   showSortMenu = false;
                 "
-                class="w-full text-left px-3 py-1.5 text-xs cursor-pointer transition-colors"
+                class="w-full text-left px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm sm:text-xs cursor-pointer transition-colors"
                 :style="{
                   color:
                     sortMode === opt.key ? category.color : 'var(--text-muted)',
@@ -200,7 +208,7 @@ function getOriginalIndex(itemId: string): number {
         </div>
         <button
           @click="emit('editCategory')"
-          class="p-1 rounded-md transition-colors cursor-pointer sm:opacity-0 sm:group-hover:opacity-100"
+          class="p-1.5 rounded-md transition-colors cursor-pointer"
           style="color: var(--text-faint)"
           title="Editar categoría"
         >
@@ -269,7 +277,7 @@ function getOriginalIndex(itemId: string): number {
               <button
                 @click.stop="
                   resetSwipe();
-                  emit('editItem', item);
+                  emit('editItemForm', item);
                 "
                 class="w-20 flex items-center justify-center cursor-pointer"
                 :style="{ background: props.category.color }"

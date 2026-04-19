@@ -632,6 +632,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
                   :class="{ 'opacity-40': draggingCategoryId === cat.id }"
                   @add-item="openAddItem(cat.id)"
                   @edit-item="openDetailItem"
+                  @edit-item-form="openEditItem"
                   @edit-category="openEditCategory(cat)"
                 />
               </div>

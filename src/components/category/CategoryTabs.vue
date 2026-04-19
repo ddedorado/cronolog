@@ -8,7 +8,19 @@ const modelValue = defineModel<string | null>({ default: null });
 const store = useCronologStore();
 const scrollRef = ref<HTMLElement | null>(null);
 
-const categories = computed(() => store.sortedCategories);
+// Only show categories that have items in the current year
+const categoriesWithItems = computed(() =>
+  store.sortedCategories.filter(
+    (c) => store.itemsForCategory(c.id).length > 0,
+  ),
+);
+
+const totalItems = computed(() =>
+  store.sortedCategories.reduce(
+    (sum, c) => sum + store.itemsForCategory(c.id).length,
+    0,
+  ),
+);
 
 function toggle(catId: string) {
   modelValue.value = modelValue.value === catId ? null : catId;
@@ -30,9 +42,12 @@ function toggle(catId: string) {
       }"
     >
       Todas
+      <span v-if="totalItems > 0" class="text-[10px] opacity-70">{{
+        totalItems
+      }}</span>
     </button>
     <button
-      v-for="cat in categories"
+      v-for="cat in categoriesWithItems"
       :key="cat.id"
       @click="toggle(cat.id)"
       class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer"
@@ -45,11 +60,9 @@ function toggle(catId: string) {
     >
       <DynamicIcon :name="cat.icon" :size="12" />
       {{ cat.name }}
-      <span
-        v-if="store.itemsForCategory(cat.id).length"
-        class="text-[10px] opacity-70"
-        >{{ store.itemsForCategory(cat.id).length }}</span
-      >
+      <span class="text-[10px] opacity-70">{{
+        store.itemsForCategory(cat.id).length
+      }}</span>
     </button>
   </div>
 </template>

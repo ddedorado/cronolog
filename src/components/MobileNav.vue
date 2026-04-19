@@ -21,7 +21,7 @@ async function handleSignOut() {
 
 <template>
   <nav
-    class="fixed bottom-0 left-0 right-0 z-50 sm:hidden pb-safe"
+    class="fixed bottom-0 left-0 right-0 z-40 sm:hidden pb-safe"
     style="
       background: color-mix(in srgb, var(--bg-elevated) 95%, transparent);
       backdrop-filter: blur(12px);

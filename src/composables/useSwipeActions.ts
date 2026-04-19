@@ -28,7 +28,18 @@ export function useSwipeActions() {
       return
     }
 
-    // Only swipe left
+    // Already open — allow right swipe to close
+    if (swipedItemId.value === currentId && swipeOffset.value <= -threshold) {
+      if (dx > 10) {
+        swiping = true
+        const newOffset = -160 + dx
+        swipeOffset.value = Math.min(0, Math.max(newOffset, -160))
+        e.preventDefault()
+        return
+      }
+    }
+
+    // Swipe left to open
     if (dx < -10) {
       swiping = true
       swipedItemId.value = currentId
@@ -38,7 +49,15 @@ export function useSwipeActions() {
   }
 
   function onTouchEnd() {
-    if (!swiping || !currentId) {
+    if (!currentId) {
+      return
+    }
+
+    if (!swiping) {
+      // Tap — if another item was swiped, close it
+      if (swipedItemId.value && swipedItemId.value !== currentId) {
+        resetSwipe()
+      }
       currentId = null
       return
     }
@@ -47,7 +66,7 @@ export function useSwipeActions() {
       // Keep swiped open
       swipeOffset.value = -160
     } else {
-      // Snap back
+      // Snap back / close
       swipedItemId.value = null
       swipeOffset.value = 0
     }

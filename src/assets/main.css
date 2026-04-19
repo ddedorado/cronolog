@@ -55,13 +55,32 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
   margin: 0;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+}
+
+/* Prevent double-tap zoom on interactive elements */
+a, button, input, select, textarea, label, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS zoom on input focus (font-size >= 16px) */
+@media (max-width: 639px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* ── Scrollbar ── */
@@ -155,17 +174,26 @@ body {
 
 /* ── Bottom Sheet (mobile modals) ── */
 @media (max-width: 639px) {
+  .modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
   .modal-backdrop > .animate-scale-in,
   .modal-backdrop > [class*="animate-scale-in"] {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
+    position: relative !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
     top: auto !important;
-    max-height: 90vh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
     border-radius: 16px 16px 0 0 !important;
     animation: slide-up-sheet 0.3s ease-out both !important;
-    padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 16px) !important;
   }
 
   .modal-backdrop > .animate-scale-in::before,
@@ -174,9 +202,32 @@ body {
     display: block;
     width: 36px;
     height: 4px;
-    background: var(--border);
+    background: var(--border-hover);
     border-radius: 2px;
-    margin: 8px auto 4px;
+    margin: 8px auto 8px;
+    flex-shrink: 0;
+    cursor: grab;
+  }
+
+  /* Dropdown menus/tooltips on mobile — full-width bottom anchored */
+  .mobile-dropdown {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 100;
+    border-radius: 12px !important;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.15) !important;
+  }
+
+  .mobile-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(0,0,0,0.3);
   }
 }
 

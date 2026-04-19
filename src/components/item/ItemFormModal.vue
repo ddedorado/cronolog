@@ -124,6 +124,41 @@ function handleBackdropClick(e: MouseEvent) {
 
 const titleInput = ref<HTMLInputElement | null>(null);
 const showDeleteConfirm = ref(false);
+
+// Drag-to-dismiss on mobile
+const dragStartY = ref(0);
+const dragOffset = ref(0);
+const isDragging = ref(false);
+const modalRef = ref<HTMLElement | null>(null);
+
+function onDragStart(e: TouchEvent) {
+  const el = modalRef.value;
+  if (!el) return;
+  // Only from handle area (top 40px) when not scrolled
+  const rect = el.getBoundingClientRect();
+  const touchY = e.touches[0].clientY;
+  if (touchY - rect.top > 40 || el.scrollTop > 0) return;
+  dragStartY.value = e.touches[0].clientY;
+  isDragging.value = true;
+}
+
+function onDragMove(e: TouchEvent) {
+  if (!isDragging.value) return;
+  const dy = e.touches[0].clientY - dragStartY.value;
+  if (dy > 0) {
+    dragOffset.value = dy;
+  }
+}
+
+function onDragEnd() {
+  if (!isDragging.value) return;
+  isDragging.value = false;
+  if (dragOffset.value > 100) {
+    emit("close");
+  }
+  dragOffset.value = 0;
+}
+
 onMounted(() => titleInput.value?.focus());
 </script>
 
@@ -134,11 +169,22 @@ onMounted(() => titleInput.value?.focus());
     @click="handleBackdropClick"
   >
     <div
-      class="w-full max-w-md rounded-xl p-6 animate-scale-in"
+      ref="modalRef"
+      class="w-full max-w-md rounded-xl p-6 animate-scale-in overflow-y-auto"
       style="
         background: var(--bg-elevated);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        max-height: 90vh;
+        -webkit-overflow-scrolling: touch;
       "
+      :style="{
+        transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
+        transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+        opacity: dragOffset > 0 ? Math.max(0.5, 1 - dragOffset / 300) : 1,
+      }"
+      @touchstart="onDragStart"
+      @touchmove="onDragMove"
+      @touchend="onDragEnd"
     >
       <!-- Header -->
       <div class="flex items-center justify-between mb-5">

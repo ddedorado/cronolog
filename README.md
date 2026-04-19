@@ -26,13 +26,13 @@ npm run dev
 
 ## Scripts
 
-| Comando            | Descripción              |
-| ------------------ | ------------------------ |
-| `npm run dev`      | Dev server (Vite)        |
-| `npm run build`    | Build producción         |
-| `npm run preview`  | Preview del build        |
-| `npm run test`     | Tests (Vitest)           |
-| `npm run typecheck`| Chequeo de tipos         |
+| Comando             | Descripción       |
+| ------------------- | ----------------- |
+| `npm run dev`       | Dev server (Vite) |
+| `npm run build`     | Build producción  |
+| `npm run preview`   | Preview del build |
+| `npm run test`      | Tests (Vitest)    |
+| `npm run typecheck` | Chequeo de tipos  |
 
 ## Funcionalidades
 
@@ -53,19 +53,19 @@ npm run dev
 
 Para importar datos en formato **CSV** o **Excel (.xlsx)**, usa estas columnas como cabecera:
 
-| Columna        | Tipo     | Requerido | Descripción                                  |
-| -------------- | -------- | --------- | -------------------------------------------- |
-| `title`        | texto    | ✅        | Título del item                              |
-| `category`     | texto    | ✅        | Nombre de la categoría (ej: Películas)       |
-| `year`         | número   | ✅        | Año del cronolog (ej: 2026)                  |
-| `rating`       | número   |           | Puntuación de 0 a 5 (admite decimales)       |
-| `releaseYear`  | número   |           | Año de estreno/publicación original          |
-| `consumedDate` | texto    |           | Fecha de consumo (YYYY-MM-DD)                |
-| `status`       | texto    |           | `completed` \| `in-progress` \| `backlog`    |
-| `favorite`     | booleano |           | `true` / `false`                             |
-| `notes`        | texto    |           | Notas personales                             |
-| `tags`         | texto    |           | Etiquetas separadas por coma                 |
-| `imageUrl`     | texto    |           | URL de la imagen/portada                     |
+| Columna        | Tipo     | Requerido | Descripción                               |
+| -------------- | -------- | --------- | ----------------------------------------- |
+| `title`        | texto    | ✅        | Título del item                           |
+| `category`     | texto    | ✅        | Nombre de la categoría (ej: Películas)    |
+| `year`         | número   | ✅        | Año del cronolog (ej: 2026)               |
+| `rating`       | número   |           | Puntuación de 0 a 5 (admite decimales)    |
+| `releaseYear`  | número   |           | Año de estreno/publicación original       |
+| `consumedDate` | texto    |           | Fecha de consumo (YYYY-MM-DD)             |
+| `status`       | texto    |           | `completed` \| `in-progress` \| `backlog` |
+| `favorite`     | booleano |           | `true` / `false`                          |
+| `notes`        | texto    |           | Notas personales                          |
+| `tags`         | texto    |           | Etiquetas separadas por coma              |
+| `imageUrl`     | texto    |           | URL de la imagen/portada                  |
 
 ### Formatos
 

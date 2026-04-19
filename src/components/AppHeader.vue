@@ -115,9 +115,9 @@ function handleImport() {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-0.5 sm:gap-1">
-        <!-- Search -->
-        <div class="flex items-center">
+      <div class="flex items-center gap-0.5 sm:gap-1" :class="{ 'hidden sm:flex': showSearch }">
+        <!-- Search (desktop inline) -->
+        <div class="hidden sm:flex items-center">
           <div
             v-if="showSearch"
             class="relative flex items-center animate-fade-in"
@@ -131,7 +131,7 @@ function handleImport() {
               @keydown.escape="toggleSearch"
               type="text"
               placeholder="Buscar..."
-              class="w-32 sm:w-44 px-3 py-1.5 pr-7 rounded-lg text-sm outline-none transition-all"
+              class="w-44 px-3 py-1.5 pr-7 rounded-lg text-sm outline-none transition-all"
               style="
                 background: var(--bg-muted);
                 color: var(--text);
@@ -160,6 +160,16 @@ function handleImport() {
           </button>
         </div>
 
+        <!-- Search (mobile icon) -->
+        <button
+          @click="toggleSearch"
+          class="sm:hidden p-2 rounded-lg transition-colors cursor-pointer"
+          :style="{ color: showSearch ? 'var(--text)' : 'var(--text-muted)' }"
+          title="Buscar"
+        >
+          <Search :size="18" />
+        </button>
+
         <button
           @click="handleExport"
           class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
@@ -180,7 +190,7 @@ function handleImport() {
 
         <button
           @click="emit('openSettings')"
-          class="p-2 rounded-lg transition-colors cursor-pointer"
+          class="p-2 rounded-lg transition-colors cursor-pointer hidden sm:flex"
           style="color: var(--text-muted)"
           title="Ajustes"
         >
@@ -276,6 +286,50 @@ function handleImport() {
       >
         <WifiOff :size="13" />
         Sin conexión — los cambios se guardarán al reconectar
+      </div>
+    </Transition>
+
+    <!-- Mobile search bar (full width, below header) -->
+    <Transition
+      enter-active-class="transition-all duration-200"
+      enter-from-class="-translate-y-2 opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-150"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-2 opacity-0"
+    >
+      <div
+        v-if="showSearch"
+        class="sm:hidden flex items-center gap-2 px-4 py-2"
+        style="border-bottom: 1px solid var(--border); background: var(--bg-elevated)"
+      >
+        <div class="relative flex-1">
+          <input
+            ref="searchInput"
+            :value="search"
+            @input="emit('update:search', ($event.target as HTMLInputElement).value)"
+            @keydown.escape="toggleSearch"
+            type="text"
+            placeholder="Buscar en tu cronolog..."
+            class="w-full px-3 py-2 pr-8 rounded-lg text-sm outline-none"
+            style="background: var(--bg-muted); color: var(--text); border: 1px solid var(--border)"
+          />
+          <button
+            v-if="search"
+            @click="emit('update:search', ''); searchInput?.focus()"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded cursor-pointer"
+            style="color: var(--text-faint)"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+        <button
+          @click="toggleSearch"
+          class="p-2 rounded-lg cursor-pointer flex-shrink-0"
+          style="color: var(--text-muted)"
+        >
+          <X :size="18" />
+        </button>
       </div>
     </Transition>
   </header>
