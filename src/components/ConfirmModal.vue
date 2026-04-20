@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
 import { AlertTriangle, X } from "lucide-vue-next";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+
+useBodyScrollLock();
 
 const props = defineProps<{
   title: string;
@@ -32,7 +35,7 @@ onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 <template>
   <Teleport to="body">
     <div
-      class="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4"
+      class="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4"
       @click="handleBackdropClick"
     >
       <!-- Overlay -->

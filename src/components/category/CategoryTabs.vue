@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useCronologStore } from "@/stores/cronolog";
 import DynamicIcon from "@/components/DynamicIcon.vue";
 
@@ -23,6 +23,20 @@ const totalItems = computed(() =>
 function toggle(catId: string) {
   modelValue.value = modelValue.value === catId ? null : catId;
 }
+
+// Keep active tab visible
+watch(modelValue, async (id) => {
+  await nextTick();
+  const track = scrollRef.value;
+  if (!track || !id) return;
+  const el = track.querySelector<HTMLElement>(`[data-cat='${id}']`);
+  if (el)
+    el.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+});
 </script>
 
 <template>
@@ -47,6 +61,7 @@ function toggle(catId: string) {
     <button
       v-for="cat in categoriesWithItems"
       :key="cat.id"
+      :data-cat="cat.id"
       @click="toggle(cat.id)"
       class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer"
       :style="{

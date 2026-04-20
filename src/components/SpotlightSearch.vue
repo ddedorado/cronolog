@@ -3,6 +3,9 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useCronologStore } from "@/stores/cronolog";
 import DynamicIcon from "@/components/DynamicIcon.vue";
 import { Search, X, Star, ArrowRight } from "lucide-vue-next";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+
+useBodyScrollLock();
 
 const emit = defineEmits<{
   close: [];
@@ -72,7 +75,7 @@ nextTick(() => inputRef.value?.focus());
 
 <template>
   <div
-    class="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
+    class="fixed inset-0 z-[60] flex items-start justify-center pt-[8vh] sm:pt-[15vh] px-4 animate-fade-in"
     style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px)"
     @click.self="emit('close')"
   >
@@ -111,7 +114,7 @@ nextTick(() => inputRef.value?.focus());
       </div>
 
       <!-- Results -->
-      <div class="max-h-[50vh] overflow-y-auto">
+      <div class="max-h-[65vh] sm:max-h-[50vh] overflow-y-auto">
         <p
           v-if="results.length === 0 && query"
           class="text-sm text-center py-8"

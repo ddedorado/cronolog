@@ -16,6 +16,10 @@ import {
 } from "lucide-vue-next";
 import StarRating from "@/components/StarRating.vue";
 import { ref, computed } from "vue";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { useDragToDismiss } from "@/composables/useDragToDismiss";
+
+useBodyScrollLock();
 
 const props = defineProps<{
   item: Item;
@@ -98,37 +102,8 @@ function handleBackdropClick(e: MouseEvent) {
 }
 
 // Drag-to-dismiss on mobile
-const dragStartY = ref(0);
-const dragOffset = ref(0);
-const isDragging = ref(false);
-const modalRef = ref<HTMLElement | null>(null);
-
-function onDragStart(e: TouchEvent) {
-  // Only allow drag from top area (handle zone)
-  const el = modalRef.value;
-  if (!el) return;
-  const scrollTop = el.scrollTop;
-  if (scrollTop > 0) return; // don't drag when scrolled
-  dragStartY.value = e.touches[0].clientY;
-  isDragging.value = true;
-}
-
-function onDragMove(e: TouchEvent) {
-  if (!isDragging.value) return;
-  const dy = e.touches[0].clientY - dragStartY.value;
-  if (dy > 0) {
-    dragOffset.value = dy;
-  }
-}
-
-function onDragEnd() {
-  if (!isDragging.value) return;
-  isDragging.value = false;
-  if (dragOffset.value > 100) {
-    emit("close");
-  }
-  dragOffset.value = 0;
-}
+const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
+  useDragToDismiss(() => emit("close"));
 </script>
 
 <template>
@@ -146,13 +121,13 @@ function onDragEnd() {
         -webkit-overflow-scrolling: touch;
       "
       :style="{
-        transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
-        transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-        opacity: dragOffset > 0 ? Math.max(0.5, 1 - dragOffset / 300) : 1,
+        transform: dragStyle.transform,
+        transition: dragStyle.transition,
+        opacity: dragStyle.opacity,
       }"
-      @touchstart="onDragStart"
-      @touchmove="onDragMove"
-      @touchend="onDragEnd"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend="onTouchEnd"
     >
       <!-- Image header -->
       <div

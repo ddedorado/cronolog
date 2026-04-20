@@ -8,6 +8,9 @@ import {
   type ImportSource,
 } from "@/services/import";
 import { Upload, FileText, X, Check } from "lucide-vue-next";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+
+useBodyScrollLock();
 
 const emit = defineEmits<{ close: [] }>();
 

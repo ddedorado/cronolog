@@ -7,6 +7,10 @@ import { X, Trash2, Plus } from "lucide-vue-next";
 import ConfirmModal from "@/components/ConfirmModal.vue";
 import type { FieldType, DataSource } from "@/schemas/cronolog";
 import { useToast } from "@/composables/useToast";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { useDragToDismiss } from "@/composables/useDragToDismiss";
+
+useBodyScrollLock();
 
 const props = defineProps<{
   category: Category | null;
@@ -148,6 +152,9 @@ function handleBackdropClick(e: MouseEvent) {
 
 const nameInput = ref<HTMLInputElement | null>(null);
 onMounted(() => nameInput.value?.focus());
+
+const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
+  useDragToDismiss(() => emit("close"), { handleTopArea: 40 });
 </script>
 
 <template>
@@ -157,12 +164,21 @@ onMounted(() => nameInput.value?.focus());
     @click="handleBackdropClick"
   >
     <div
+      ref="modalRef"
       class="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-xl p-6 animate-scale-in"
       style="
         background: var(--bg-elevated);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         -webkit-overflow-scrolling: touch;
       "
+      :style="{
+        transform: dragStyle.transform,
+        transition: dragStyle.transition,
+        opacity: dragStyle.opacity,
+      }"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend="onTouchEnd"
     >
       <!-- Header -->
       <div class="flex items-center justify-between mb-5">

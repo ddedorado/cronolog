@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { X } from "lucide-vue-next";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+
+useBodyScrollLock();
 
 const emit = defineEmits<{ close: [] }>();
 

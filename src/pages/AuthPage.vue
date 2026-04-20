@@ -196,8 +196,8 @@ function switchMode(newMode: "login" | "register" | "forgot") {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
-    style="background: var(--bg)"
+    class="flex items-center justify-center px-4 relative overflow-hidden"
+    style="background: var(--bg); min-height: 100dvh"
   >
     <!-- Decorative background -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden">

@@ -106,6 +106,11 @@ function checkOnboarding() {
   }
 }
 
+// Re-evaluate onboarding when items or years change (e.g. after deletes)
+watch([() => store.items.length, () => store.hasYears], () =>
+  checkOnboarding(),
+);
+
 function dismissOnboarding() {
   showOnboarding.value = false;
   localStorage.setItem("cronolog_onboarding_v2_done", "1");
@@ -135,19 +140,33 @@ watch(
   },
 );
 
-// Filter items by search
-function filteredItemsForCategory(categoryId: string) {
-  const items = store.itemsForCategory(categoryId);
-  if (!searchQuery.value.trim()) return items;
+// Filter items by search (memoized per render via computed Map)
+const filteredItemsMap = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
-  return items.filter(
-    (i) =>
-      i.title.toLowerCase().includes(q) ||
-      (i.releaseYear && String(i.releaseYear).includes(q)) ||
-      Object.values(i.customFields).some((v) =>
-        String(v).toLowerCase().includes(q),
-      ),
-  );
+  const map = new Map<string, Item[]>();
+  for (const cat of store.sortedCategories) {
+    const items = store.itemsForCategory(cat.id);
+    if (!q) {
+      map.set(cat.id, items);
+    } else {
+      map.set(
+        cat.id,
+        items.filter(
+          (i) =>
+            i.title.toLowerCase().includes(q) ||
+            (i.releaseYear && String(i.releaseYear).includes(q)) ||
+            Object.values(i.customFields).some((v) =>
+              String(v).toLowerCase().includes(q),
+            ),
+        ),
+      );
+    }
+  }
+  return map;
+});
+
+function filteredItemsForCategory(categoryId: string) {
+  return filteredItemsMap.value.get(categoryId) ?? [];
 }
 
 // Filter categories: by tab + hide empty when searching
@@ -372,14 +391,23 @@ function handleKeyboard(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener("keydown", handleKeyboard);
   checkOnboarding();
+  const mq = window.matchMedia("(pointer: coarse)");
   isTouchDevice.value =
-    "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    mq.matches || "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  const onChange = (e: MediaQueryListEvent) => {
+    isTouchDevice.value = e.matches;
+  };
+  mq.addEventListener("change", onChange);
+  onUnmounted(() => mq.removeEventListener("change", onChange));
 });
 onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 </script>
 
 <template>
-  <div class="min-h-screen pb-16 sm:pb-0" style="background: var(--bg)">
+  <div
+    class="min-h-screen pb-[calc(56px+env(safe-area-inset-bottom))] sm:pb-0"
+    style="background: var(--bg)"
+  >
     <!-- Pull-to-refresh indicator -->
     <div
       v-if="pullDistance > 0 || refreshing"
@@ -448,36 +476,48 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 
       <!-- Has years -->
       <template v-else>
-        <YearSelector />
-
-        <!-- Empty state: no categories -->
+        <!-- Sticky subheader on mobile: year selector + category tabs -->
         <div
-          v-if="store.sortedCategories.length === 0"
-          class="mt-16 flex flex-col items-center justify-center text-center animate-fade-in"
+          class="sm:static sticky top-14 z-20 -mx-3 sm:mx-0 px-3 sm:px-0 sm:bg-transparent"
+          style="
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            backdrop-filter: blur(8px);
+          "
         >
-          <FolderPlus :size="48" style="color: var(--text-faint)" />
-          <h2 class="font-display text-2xl mt-4" style="color: var(--text)">
-            Añade tu primera categoría
-          </h2>
-          <p class="text-sm mt-2 max-w-xs" style="color: var(--text-muted)">
-            Crea categorías como Películas, Libros, Juegos… para organizar tu
-            consumo.
-          </p>
-          <button
-            @click="openAddCategory"
-            class="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
-            style="background: var(--text); color: var(--bg)"
+          <YearSelector />
+
+          <!-- Empty state: no categories -->
+          <div
+            v-if="store.sortedCategories.length === 0"
+            class="mt-16 flex flex-col items-center justify-center text-center animate-fade-in"
           >
-            <Plus :size="16" />
-            Nueva categoría
-          </button>
+            <FolderPlus :size="48" style="color: var(--text-faint)" />
+            <h2 class="font-display text-2xl mt-4" style="color: var(--text)">
+              Añade tu primera categoría
+            </h2>
+            <p class="text-sm mt-2 max-w-xs" style="color: var(--text-muted)">
+              Crea categorías como Películas, Libros, Juegos… para organizar tu
+              consumo.
+            </p>
+            <button
+              @click="openAddCategory"
+              class="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
+              style="background: var(--text); color: var(--bg)"
+            >
+              <Plus :size="16" />
+              Nueva categoría
+            </button>
+          </div>
+
+          <!-- Category filter tabs (mobile) -->
+          <CategoryTabs
+            v-if="store.sortedCategories.length > 0"
+            v-model="activeCategoryFilter"
+          />
         </div>
 
         <!-- Has categories -->
-        <template v-else>
-          <!-- Category filter tabs (mobile) -->
-          <CategoryTabs v-model="activeCategoryFilter" />
-
+        <template v-if="store.sortedCategories.length > 0">
           <!-- Toolbar: view toggle + actions -->
           <div class="mt-4 flex items-center justify-between gap-2">
             <!-- View toggle -->
@@ -600,7 +640,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 
           <!-- Content views -->
           <Transition :name="yearTransition" mode="out-in">
-            <div :key="`${store.activeYear}-${viewMode}`">
+            <div :key="store.activeYear">
               <!-- Table view (desktop) -->
               <div v-if="viewMode === 'table'" class="mt-6">
                 <TableView @edit-item="openDetailItem" />

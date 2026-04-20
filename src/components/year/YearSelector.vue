@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCronologStore } from "@/stores/cronolog";
-import { computed, ref } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from "lucide-vue-next";
 import ConfirmModal from "@/components/ConfirmModal.vue";
 
@@ -17,6 +17,29 @@ const deleteItemCount = ref(0);
 
 // Mobile: show manage mode to reveal delete buttons
 const manageMode = ref(false);
+
+// Scroll track so the active year stays visible when user switches
+const scrollTrack = ref<HTMLElement | null>(null);
+
+watch(
+  () => store.activeYear,
+  async () => {
+    await nextTick();
+    const track = scrollTrack.value;
+    if (!track) return;
+    const active = track.querySelector<HTMLElement>(
+      "[data-active-year='true']",
+    );
+    if (active) {
+      active.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  },
+  { immediate: true },
+);
 
 const displayYears = computed(() => {
   return store.availableYears;
@@ -80,11 +103,13 @@ function confirmDeleteYear() {
       </button>
 
       <div
+        ref="scrollTrack"
         class="flex gap-1 overflow-x-auto py-2 -my-2 px-1 -mx-1 scrollbar-none"
       >
         <div
           v-for="year in displayYears"
           :key="year"
+          :data-active-year="year === store.activeYear ? 'true' : 'false'"
           class="group/year relative flex items-center"
         >
           <button

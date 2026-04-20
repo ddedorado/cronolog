@@ -14,8 +14,14 @@ import { verifyTMDBKey } from "@/services/enrichment/tmdb";
 import { verifyRAWGKey } from "@/services/enrichment/rawg";
 import { verifyGoogleBooksKey } from "@/services/enrichment/googlebooks";
 import { verifyComicVineKey } from "@/services/enrichment/comicvine";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { useDragToDismiss } from "@/composables/useDragToDismiss";
+
+useBodyScrollLock();
 
 const emit = defineEmits<{ close: [] }>();
+const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
+  useDragToDismiss(() => emit("close"));
 const settings = useSettingsStore();
 
 const tmdbKey = ref(settings.apiKeys.tmdb ?? "");
@@ -108,12 +114,21 @@ function handleBackdropClick(e: MouseEvent) {
     @click="handleBackdropClick"
   >
     <div
+      ref="modalRef"
       class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl p-6 animate-scale-in"
       style="
         background: var(--bg-elevated);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         -webkit-overflow-scrolling: touch;
       "
+      :style="{
+        transform: dragStyle.transform,
+        transition: dragStyle.transition,
+        opacity: dragStyle.opacity,
+      }"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend="onTouchEnd"
     >
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">

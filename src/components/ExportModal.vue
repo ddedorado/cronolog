@@ -3,6 +3,11 @@ import { ref, computed } from "vue";
 import { useCronologStore } from "@/stores/cronolog";
 import { useToast } from "@/composables/useToast";
 import { doExport, type ExportFormat } from "@/services/exportImport";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { useDragToDismiss } from "@/composables/useDragToDismiss";
+
+useBodyScrollLock();
+
 import {
   X,
   Download,
@@ -13,6 +18,9 @@ import {
 } from "lucide-vue-next";
 
 const emit = defineEmits<{ close: [] }>();
+
+const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
+  useDragToDismiss(() => emit("close"));
 
 const store = useCronologStore();
 const toast = useToast();
@@ -107,12 +115,21 @@ function handleExport() {
     @click.self="emit('close')"
   >
     <div
+      ref="modalRef"
       class="w-full max-w-md rounded-xl p-5 animate-scale-in max-h-[85vh] overflow-y-auto"
       style="
         background: var(--bg-elevated);
         box-shadow: var(--shadow-modal);
         border: 1px solid var(--border);
       "
+      :style="{
+        transform: dragStyle.transform,
+        transition: dragStyle.transition,
+        opacity: dragStyle.opacity,
+      }"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend="onTouchEnd"
     >
       <div class="flex items-center justify-between mb-4">
         <h2 class="font-display text-lg" style="color: var(--text)">

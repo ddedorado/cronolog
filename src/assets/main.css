@@ -58,9 +58,7 @@
 html {
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
-}
-
-body {
+}body {
   font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
@@ -68,11 +66,10 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  touch-action: manipulation;
 }
 
-/* Prevent double-tap zoom on interactive elements */
-a, button, input, select, textarea, label, [role="button"] {
+/* Only disable double-tap zoom on interactive controls, keep pinch-zoom for a11y */
+a, button, input, select, textarea, label, [role="button"], [role="tab"], [role="menuitem"] {
   touch-action: manipulation;
 }
 
@@ -172,6 +169,13 @@ a, button, input, select, textarea, label, [role="button"] {
   }
 }
 
+/* ── Scroll chain prevention on every modal scrollable area ── */
+.modal-backdrop,
+.modal-backdrop > * {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Bottom Sheet (mobile modals) ── */
 @media (max-width: 639px) {
   .modal-backdrop {
@@ -190,6 +194,7 @@ a, button, input, select, textarea, label, [role="button"] {
     max-width: 100% !important;
     max-height: 85vh !important;
     overflow-y: auto !important;
+    overscroll-behavior: contain !important;
     -webkit-overflow-scrolling: touch !important;
     border-radius: 16px 16px 0 0 !important;
     animation: slide-up-sheet 0.3s ease-out both !important;
