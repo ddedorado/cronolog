@@ -9,9 +9,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Force PKCE flow: the auth code lands in the query string (?code=xxx)
-    // which is NOT affected by hash-based routing. With detectSessionInUrl
-    // enabled (default), Supabase auto-detects and exchanges the code.
+    // Hash-based routing (#/) breaks Supabase's automatic OAuth detection:
+    //   - Implicit flow tokens end up as #/access_token=... (leading '/' corrupts parsing)
+    //   - PKCE code ends up in ?code= query string (works, but we handle it manually too)
+    // We disable auto-detection and handle both flows in useAuth → handleOAuthRedirect().
+    detectSessionInUrl: false,
     flowType: 'pkce',
   },
 })
