@@ -9,10 +9,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Disable automatic detection: it fails with hash-based routing because
-    // the OAuth params end up inside the hash fragment (e.g. #/access_token=...)
-    // and supabase-js can't parse them with the route prefix. We handle it
-    // manually in useAuth.ts → handleOAuthRedirectInHash().
-    detectSessionInUrl: false,
+    // Force PKCE flow: the auth code lands in the query string (?code=xxx)
+    // which is NOT affected by hash-based routing. With detectSessionInUrl
+    // enabled (default), Supabase auto-detects and exchanges the code.
+    flowType: 'pkce',
   },
 })
