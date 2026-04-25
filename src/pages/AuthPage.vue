@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useSupabaseSync } from "@/composables/useSupabaseSync";
 import { useTheme } from "@/composables/useTheme";
-import { validateInviteCode, isInviteOnly } from "@/utils/invite";
+import { validateInviteCode, redeemInviteCode, isInviteOnly, type InviteResult } from "@/utils/invite";
 import {
   LogIn,
   UserPlus,
@@ -59,14 +59,37 @@ const emailError = computed(() => {
   return emailValid.value ? "" : "Email no válido";
 });
 
+// Async invite validation state
+const inviteResult = ref<InviteResult | null>(null);
+const inviteChecking = ref(false);
+let inviteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 const inviteValid = computed(() => {
   if (!requiresInvite) return true;
-  return validateInviteCode(inviteCode.value);
+  return inviteResult.value?.valid === true;
 });
 const inviteError = computed(() => {
   if (!requiresInvite || !touched.value.invite || !inviteCode.value.trim())
     return "";
-  return inviteValid.value ? "" : "Código no válido";
+  if (inviteChecking.value) return "";
+  if (!inviteResult.value) return "";
+  const reason = inviteResult.value.reason;
+  if (reason === "exhausted") return "Código agotado";
+  if (reason === "expired") return "Código expirado";
+  return inviteResult.value.valid ? "" : "Código no válido";
+});
+
+// Debounced async validation as user types
+watch(inviteCode, (code) => {
+  if (inviteDebounceTimer) clearTimeout(inviteDebounceTimer);
+  inviteResult.value = null;
+  const trimmed = code.trim();
+  if (!trimmed || !requiresInvite) return;
+  inviteChecking.value = true;
+  inviteDebounceTimer = setTimeout(async () => {
+    inviteResult.value = await validateInviteCode(trimmed);
+    inviteChecking.value = false;
+  }, 400);
 });
 
 const passwordStrength = computed(() => {
@@ -117,10 +140,19 @@ watch(mode, () => {
 async function handleSubmit() {
   if (!isFormValid.value) return;
 
-  // Validate invite code before calling Supabase
-  if (mode.value === "register" && requiresInvite && !inviteValid.value) {
-    error.value = "Código de invitación no válido";
-    return;
+  // Validate & redeem invite code before calling Supabase
+  if (mode.value === "register" && requiresInvite) {
+    const result = await redeemInviteCode(inviteCode.value);
+    if (!result.valid) {
+      if (result.reason === "exhausted") {
+        error.value = "Este código de invitación ha agotado sus usos";
+      } else if (result.reason === "expired") {
+        error.value = "Este código de invitación ha expirado";
+      } else {
+        error.value = "Código de invitación no válido";
+      }
+      return;
+    }
   }
 
   loading.value = true;
@@ -587,8 +619,14 @@ function switchMode(newMode: "login" | "register" | "forgot") {
                       : 'var(--border)',
                 }"
               />
+              <Loader2
+                v-if="inviteChecking"
+                :size="15"
+                class="absolute right-3 top-1/2 -translate-y-1/2 animate-spin"
+                style="color: var(--text-faint)"
+              />
               <CheckCircle2
-                v-if="touched.invite && inviteValid && inviteCode.trim()"
+                v-else-if="touched.invite && inviteValid && inviteCode.trim()"
                 :size="15"
                 class="absolute right-3 top-1/2 -translate-y-1/2"
                 style="color: #22c55e"
@@ -600,6 +638,9 @@ function switchMode(newMode: "login" | "register" | "forgot") {
               style="color: #ef4444"
             >
               {{ inviteError }}
+            </p>
+            <p v-else-if="inviteResult?.valid && inviteResult.remaining != null" class="text-[10px] mt-1" style="color: #22c55e">
+              Código válido · {{ inviteResult.remaining }} {{ inviteResult.remaining === 1 ? 'uso restante' : 'usos restantes' }}
             </p>
             <p v-else class="text-[10px] mt-1" style="color: var(--text-faint)">
               Necesitas un código para crear tu cuenta.
