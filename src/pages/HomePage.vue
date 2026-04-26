@@ -25,6 +25,7 @@ import {
   defineAsyncComponent,
 } from "vue";
 import type { Item, Category } from "@/schemas/cronolog";
+import { CORE_CATEGORY_IDS } from "@/schemas/cronolog";
 import {
   Plus,
   CalendarPlus,
@@ -178,6 +179,11 @@ const filteredCategories = computed(() => {
   // When searching, hide categories with no matching items
   if (searchQuery.value.trim()) {
     cats = cats.filter((c) => filteredItemsForCategory(c.id).length > 0);
+  } else {
+    // Hide non-core categories that have no items for the active year
+    cats = cats.filter(
+      (c) => CORE_CATEGORY_IDS.has(c.id) || store.itemsForCategory(c.id).length > 0,
+    );
   }
   return cats;
 });

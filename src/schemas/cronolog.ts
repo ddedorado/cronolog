@@ -66,6 +66,9 @@ export interface CronologState {
   activeYear: number
 }
 
+/** Categories that always appear even when empty */
+export const CORE_CATEGORY_IDS = new Set(['peliculas', 'libros', 'tv', 'juegos'])
+
 export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'peliculas',
