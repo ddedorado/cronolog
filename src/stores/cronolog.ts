@@ -11,6 +11,7 @@ export const useCronologStore = defineStore(
     const activeYear = ref(new Date().getFullYear())
     const addedYears = ref<number[]>([])
     const deletedCategoryIds = ref<string[]>([])
+    const dashboardMode = ref<'cronolog' | 'wishlist'>('cronolog')
 
     // ── Getters ──
     const sortedCategories = computed(() =>
@@ -65,11 +66,39 @@ export const useCronologStore = defineStore(
 
     const availableYears = computed(() => {
       const years = new Set<number>([
-        ...items.value.map((i) => i.year),
+        ...items.value.map((i) => i.year).filter((y) => y !== 0),
         ...addedYears.value,
       ])
       return [...years].sort((a, b) => a - b)
     })
+
+    // ── Wishlist getters ──
+    const isWishlistMode = computed(() => dashboardMode.value === 'wishlist')
+
+    const wishlistItems = computed(() =>
+      items.value.filter((i) => i.year === 0 && i.status === 'backlog'),
+    )
+
+    function wishlistItemsForCategory(categoryId: string): Item[] {
+      return wishlistItems.value
+        .filter((i) => i.categoryId === categoryId)
+        .sort((a, b) => {
+          const oa = a.order ?? 0
+          const ob = b.order ?? 0
+          if (oa !== ob) return oa - ob
+          return a.createdAt.localeCompare(b.createdAt)
+        })
+    }
+
+    const wishlistStats = computed(() => {
+      const stats: Record<string, number> = {}
+      for (const cat of categories.value) {
+        stats[cat.id] = wishlistItems.value.filter((i) => i.categoryId === cat.id).length
+      }
+      return stats
+    })
+
+    const totalWishlistItems = computed(() => wishlistItems.value.length)
 
     const yearStats = computed(() => {
       const stats: Record<string, number> = {}
@@ -197,6 +226,26 @@ export const useCronologStore = defineStore(
       if (data.categories) categories.value = data.categories
       if (data.items) items.value = data.items
       if (data.addedYears) addedYears.value = data.addedYears
+    }
+
+    // ── Actions: Dashboard mode ──
+    function setDashboardMode(mode: 'cronolog' | 'wishlist') {
+      dashboardMode.value = mode
+    }
+
+    function addWishlistItem(item: Item) {
+      items.value = [...items.value, { ...item, year: 0, status: 'backlog', rating: 0, consumedDate: '' }]
+    }
+
+    function markAsConsumed(itemId: string, options?: { year?: number; rating?: number; consumedDate?: string }) {
+      const year = options?.year ?? new Date().getFullYear()
+      const rating = options?.rating ?? 0
+      const consumedDate = options?.consumedDate ?? new Date().toISOString().split('T')[0]
+      updateItem(itemId, { year, rating, consumedDate, status: 'completed' })
+      // Ensure the target year exists
+      if (!addedYears.value.includes(year)) {
+        addedYears.value = [...addedYears.value, year]
+      }
     }
 
     // ── Migration: ensure addedYears includes years from items + activeYear ──
@@ -336,6 +385,7 @@ export const useCronologStore = defineStore(
       activeYear,
       addedYears,
       deletedCategoryIds,
+      dashboardMode,
       hasYears,
       sortedCategories,
       itemsByYear,
@@ -343,6 +393,11 @@ export const useCronologStore = defineStore(
       availableYears,
       yearStats,
       totalActiveItems,
+      isWishlistMode,
+      wishlistItems,
+      wishlistItemsForCategory,
+      wishlistStats,
+      totalWishlistItems,
       itemsForCategory,
       addItem,
       updateItem,
@@ -359,6 +414,9 @@ export const useCronologStore = defineStore(
       removeYear,
       exportData,
       importData,
+      setDashboardMode,
+      addWishlistItem,
+      markAsConsumed,
       migrateData,
     }
   },

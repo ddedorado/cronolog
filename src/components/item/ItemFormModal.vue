@@ -17,6 +17,7 @@ useBodyScrollLock();
 const props = defineProps<{
   item: Item | null;
   categoryId: string | null;
+  wishlistMode?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -39,6 +40,7 @@ const selectedCategoryId = ref(
 const customFields = ref<Record<string, string | number>>({
   ...(props.item?.customFields ?? {}),
 });
+const notes = ref(props.item?.notes ?? "");
 
 const isEditing = computed(() => props.item !== null);
 
@@ -83,16 +85,16 @@ function handleSubmit() {
     const newItem: Item = {
       id: generateId(),
       categoryId: selectedCategoryId.value,
-      year: store.activeYear,
+      year: props.wishlistMode ? 0 : store.activeYear,
       title: title.value.trim(),
       releaseYear: releaseYear.value,
-      consumedDate: consumedDate.value,
+      consumedDate: props.wishlistMode ? '' : consumedDate.value,
       imageUrl: imageUrl.value.trim(),
-      rating: rating.value,
+      rating: props.wishlistMode ? 0 : rating.value,
       order: 0,
-      status: "completed",
+      status: props.wishlistMode ? 'backlog' : 'completed',
       favorite: false,
-      notes: "",
+      notes: props.wishlistMode ? notes.value : '',
       tags: [],
       customFields: customFields.value,
       enrichmentData: null,
@@ -163,7 +165,7 @@ onMounted(() => titleInput.value?.focus());
       <!-- Header -->
       <div class="flex items-center justify-between mb-5">
         <h2 class="font-display text-xl" style="color: var(--text)">
-          {{ isEditing ? "Editar" : "Añadir" }}
+          {{ isEditing ? "Editar" : props.wishlistMode ? "Añadir a Wishlist" : "Añadir" }}
           {{ selectedCategory?.name?.slice(0, -1) ?? "elemento" }}
         </h2>
         <button
@@ -299,7 +301,7 @@ onMounted(() => titleInput.value?.focus());
         </div>
 
         <!-- Consumed date -->
-        <div>
+        <div v-if="!props.wishlistMode">
           <label
             class="block text-xs font-medium mb-1.5"
             style="color: var(--text-muted)"
@@ -318,13 +320,33 @@ onMounted(() => titleInput.value?.focus());
         </div>
 
         <!-- Rating -->
-        <div>
+        <div v-if="!props.wishlistMode">
           <label
             class="block text-xs font-medium mb-1.5"
             style="color: var(--text-muted)"
             >Valoración</label
           >
           <StarRating v-model="rating" :size="22" />
+        </div>
+
+        <!-- Notes (always visible in wishlist, useful for observations) -->
+        <div v-if="props.wishlistMode">
+          <label
+            class="block text-xs font-medium mb-1.5"
+            style="color: var(--text-muted)"
+            >Notas / Observaciones</label
+          >
+          <textarea
+            v-model="notes"
+            rows="2"
+            placeholder="Ej: Esperando a que baje de precio..."
+            class="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors resize-none"
+            style="
+              background: var(--bg-muted);
+              color: var(--text);
+              border: 1px solid var(--border);
+            "
+          />
         </div>
 
         <!-- Custom fields for the selected category -->

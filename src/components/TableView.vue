@@ -11,6 +11,10 @@ import {
 } from "lucide-vue-next";
 import type { Item } from "@/schemas/cronolog";
 
+const props = defineProps<{
+  wishlistMode?: boolean;
+}>();
+
 const emit = defineEmits<{
   editItem: [item: Item];
 }>();
@@ -22,7 +26,8 @@ const sortKey = ref<
 const sortAsc = ref(false);
 
 const items = computed(() => {
-  const list = store.activeItems.map((item) => ({
+  const sourceItems = props.wishlistMode ? store.wishlistItems : store.activeItems;
+  const list = sourceItems.map((item) => ({
     item,
     category: store.categories.find((c) => c.id === item.categoryId),
   }));
@@ -133,7 +138,7 @@ function sortIcon(key: typeof sortKey.value) {
                 />
               </button>
             </th>
-            <th class="text-left font-medium px-3 py-2">
+            <th v-if="!props.wishlistMode" class="text-left font-medium px-3 py-2">
               <button
                 class="flex items-center gap-1 cursor-pointer"
                 @click="toggleSort('consumedDate')"
@@ -225,6 +230,7 @@ function sortIcon(key: typeof sortKey.value) {
               {{ item.releaseYear ?? "—" }}
             </td>
             <td
+              v-if="!props.wishlistMode"
               class="px-3 py-2 font-mono text-xs"
               style="color: var(--text-muted)"
             >
@@ -239,7 +245,7 @@ function sortIcon(key: typeof sortKey.value) {
       class="text-center py-8 text-sm"
       style="color: var(--text-faint)"
     >
-      No hay items en {{ store.activeYear }}
+      No hay items en {{ props.wishlistMode ? 'tu Wishlist' : store.activeYear }}
     </div>
   </div>
 </template>

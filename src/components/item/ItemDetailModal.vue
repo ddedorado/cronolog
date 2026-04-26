@@ -13,6 +13,7 @@ import {
   Loader2,
   Heart,
   StickyNote,
+  CheckCircle,
 } from "lucide-vue-next";
 import StarRating from "@/components/StarRating.vue";
 import { ref, computed } from "vue";
@@ -24,11 +25,13 @@ useBodyScrollLock();
 const props = defineProps<{
   item: Item;
   category: Category;
+  wishlistMode?: boolean;
 }>();
 
 const emit = defineEmits<{
   close: [];
   edit: [];
+  markConsumed: [item: Item];
 }>();
 
 const settings = useSettingsStore();
@@ -202,7 +205,7 @@ const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
 
         <!-- Rating + Favorite -->
         <div class="flex items-center gap-3 mt-3">
-          <div v-if="item.rating && item.rating > 0" class="flex-1">
+          <div v-if="item.rating && item.rating > 0 && !props.wishlistMode" class="flex-1">
             <StarRating
               :model-value="item.rating"
               :readonly="true"
@@ -240,7 +243,7 @@ const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
 
         <!-- Consumed date -->
         <p
-          v-if="item.consumedDate"
+          v-if="item.consumedDate && !props.wishlistMode"
           class="flex items-center gap-1.5 text-xs mt-3"
           style="color: var(--text-muted)"
         >
@@ -378,6 +381,15 @@ const { modalRef, dragStyle, onTouchStart, onTouchMove, onTouchEnd } =
           class="flex items-center gap-2 mt-5 pt-4"
           style="border-top: 1px solid var(--border)"
         >
+          <button
+            v-if="props.wishlistMode"
+            @click="emit('markConsumed', item)"
+            class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium text-white cursor-pointer transition-colors"
+            style="background: #22c55e"
+          >
+            <CheckCircle :size="14" />
+            Consumido
+          </button>
           <button
             @click="emit('edit')"
             class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"

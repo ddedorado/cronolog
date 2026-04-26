@@ -16,6 +16,7 @@ import SpotlightSearch from "@/components/SpotlightSearch.vue";
 import CategoryTabs from "@/components/category/CategoryTabs.vue";
 import ExpandedStats from "@/components/stats/ExpandedStats.vue";
 import ActivityTimeline from "@/components/ActivityTimeline.vue";
+import StarRating from "@/components/StarRating.vue";
 import {
   ref,
   computed,
@@ -141,12 +142,24 @@ watch(
   },
 );
 
+// Reset view mode when switching to wishlist (stats/timeline not available)
+watch(
+  () => store.isWishlistMode,
+  (isWishlist) => {
+    if (isWishlist && (viewMode.value === 'stats' || viewMode.value === 'timeline')) {
+      viewMode.value = 'grid';
+    }
+  },
+);
+
 // Filter items by search (memoized per render via computed Map)
 const filteredItemsMap = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   const map = new Map<string, Item[]>();
   for (const cat of store.sortedCategories) {
-    const items = store.itemsForCategory(cat.id);
+    const items = store.isWishlistMode
+      ? store.wishlistItemsForCategory(cat.id)
+      : store.itemsForCategory(cat.id);
     if (!q) {
       map.set(cat.id, items);
     } else {
@@ -179,6 +192,11 @@ const filteredCategories = computed(() => {
   // When searching, hide categories with no matching items
   if (searchQuery.value.trim()) {
     cats = cats.filter((c) => filteredItemsForCategory(c.id).length > 0);
+  } else if (store.isWishlistMode) {
+    // In wishlist mode, show core categories + any with wishlist items
+    cats = cats.filter(
+      (c) => CORE_CATEGORY_IDS.has(c.id) || store.wishlistItemsForCategory(c.id).length > 0,
+    );
   } else {
     // Hide non-core categories that have no items for the active year
     cats = cats.filter(
@@ -254,8 +272,10 @@ function onItemModalClose() {
       cat.dataSource !== "none" &&
       settingsStore.hasKeyForSource(cat.dataSource)
     ) {
-      const items = store.itemsForCategory(cat.id);
-      const latest = [...items].sort((a, b) =>
+      const itemList = store.isWishlistMode
+        ? store.wishlistItemsForCategory(cat.id)
+        : store.itemsForCategory(cat.id);
+      const latest = [...itemList].sort((a, b) =>
         b.createdAt.localeCompare(a.createdAt),
       )[0];
       if (latest && !latest.enrichmentData) {
@@ -266,8 +286,10 @@ function onItemModalClose() {
 
   // Track recently added for pop animation
   if (!editingItem.value) {
-    const items = store.itemsForCategory(preselectedCategoryId.value ?? "");
-    const latest = [...items].sort((a, b) =>
+    const itemList = store.isWishlistMode
+      ? store.wishlistItemsForCategory(preselectedCategoryId.value ?? "")
+      : store.itemsForCategory(preselectedCategoryId.value ?? "");
+    const latest = [...itemList].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     )[0];
     if (latest) {
@@ -283,6 +305,32 @@ function onItemModalClose() {
 const showCategoryModal = ref(false);
 const editingCategory = ref<Category | null>(null);
 const categoryModalKey = ref(0);
+
+// Mark as consumed modal state (wishlist → cronolog)
+const showConsumedModal = ref(false);
+const consumedItem = ref<Item | null>(null);
+const consumedRating = ref(0);
+const consumedYear = ref(new Date().getFullYear());
+const consumedDate = ref(new Date().toISOString().split('T')[0]);
+
+function openMarkConsumed(item: Item) {
+  consumedItem.value = item;
+  consumedRating.value = 0;
+  consumedYear.value = new Date().getFullYear();
+  consumedDate.value = new Date().toISOString().split('T')[0];
+  showConsumedModal.value = true;
+}
+
+function confirmMarkConsumed() {
+  if (!consumedItem.value) return;
+  store.markAsConsumed(consumedItem.value.id, {
+    year: consumedYear.value,
+    rating: consumedRating.value,
+    consumedDate: consumedDate.value,
+  });
+  showConsumedModal.value = false;
+  consumedItem.value = null;
+}
 
 // Category drag reorder (desktop only)
 const draggingCategoryId = ref<string | null>(null);
@@ -490,7 +538,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
             backdrop-filter: blur(8px);
           "
         >
-          <YearSelector />
+          <YearSelector v-if="!store.isWishlistMode" />
 
           <!-- Empty state: no categories -->
           <div
@@ -585,6 +633,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
               </button>
               <button
                 @click="viewMode = 'stats'"
+                v-if="!store.isWishlistMode"
                 class="p-1.5 rounded-md transition-colors cursor-pointer"
                 :style="{
                   background:
@@ -600,6 +649,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
               </button>
               <button
                 @click="viewMode = 'timeline'"
+                v-if="!store.isWishlistMode"
                 class="p-1.5 rounded-md transition-colors cursor-pointer"
                 :style="{
                   background:
@@ -646,19 +696,19 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
 
           <!-- Content views -->
           <Transition :name="yearTransition" mode="out-in">
-            <div :key="store.activeYear">
+            <div :key="store.isWishlistMode ? 'wishlist' : store.activeYear">
               <!-- Table view (desktop) -->
               <div v-if="viewMode === 'table'" class="mt-6">
-                <TableView @edit-item="openDetailItem" />
+                <TableView :wishlist-mode="store.isWishlistMode" @edit-item="openDetailItem" />
               </div>
 
               <!-- Stats view -->
-              <div v-else-if="viewMode === 'stats'" class="mt-6">
+              <div v-else-if="viewMode === 'stats' && !store.isWishlistMode" class="mt-6">
                 <ExpandedStats />
               </div>
 
               <!-- Timeline view -->
-              <div v-else-if="viewMode === 'timeline'" class="mt-6">
+              <div v-else-if="viewMode === 'timeline' && !store.isWishlistMode" class="mt-6">
                 <ActivityTimeline @select-item="openDetailItem" />
               </div>
 
@@ -675,6 +725,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
                   :items="filteredItemsForCategory(cat.id)"
                   :compact="compactView"
                   :highlight-item-id="recentlyAddedItemId"
+                  :wishlist-mode="store.isWishlistMode"
                   :draggable="!isTouchDevice"
                   @dragstart="onCategoryDragStart($event, cat.id)"
                   @dragover.prevent="onCategoryDragOver($event, cat.id)"
@@ -684,13 +735,14 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
                   @edit-item="openDetailItem"
                   @edit-item-form="openEditItem"
                   @edit-category="openEditCategory(cat)"
+                  @mark-consumed="openMarkConsumed"
                 />
               </div>
             </div>
           </Transition>
 
-          <!-- Stats bar (always visible in non-stats view) -->
-          <YearStats v-if="viewMode !== 'stats'" class="mt-8" />
+          <!-- Stats bar (always visible in non-stats view, hide in wishlist) -->
+          <YearStats v-if="viewMode !== 'stats' && !store.isWishlistMode" class="mt-8" />
         </template>
       </template>
     </main>
@@ -701,6 +753,7 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
       :key="itemModalKey"
       :item="editingItem"
       :category-id="preselectedCategoryId"
+      :wishlist-mode="store.isWishlistMode"
       @close="onItemModalClose"
     />
 
@@ -708,11 +761,13 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
       v-if="showDetailModal && detailItem && detailCategory"
       :item="detailItem"
       :category="detailCategory"
+      :wishlist-mode="store.isWishlistMode"
       @close="
         showDetailModal = false;
         detailItemId = null;
       "
       @edit="onDetailEdit"
+      @mark-consumed="(item) => { showDetailModal = false; detailItemId = null; openMarkConsumed(item); }"
     />
 
     <CategoryFormModal
@@ -732,6 +787,70 @@ onUnmounted(() => document.removeEventListener("keydown", handleKeyboard));
     <ExportModal v-if="showExportModal" @close="showExportModal = false" />
 
     <EnrichmentToast />
+
+    <!-- Mark as consumed mini-modal (wishlist → cronolog) -->
+    <div
+      v-if="showConsumedModal && consumedItem"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px)"
+      @click.self="showConsumedModal = false"
+    >
+      <div
+        class="w-full max-w-sm rounded-xl p-5 animate-scale-in"
+        style="background: var(--bg-elevated); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15)"
+      >
+        <h3 class="font-display text-lg mb-1" style="color: var(--text)">
+          Marcar como consumido
+        </h3>
+        <p class="text-xs mb-4" style="color: var(--text-muted)">
+          "{{ consumedItem.title }}" pasará a tu Cronolog.
+        </p>
+
+        <div class="flex flex-col gap-3">
+          <div>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Valoración</label>
+            <StarRating v-model="consumedRating" :size="22" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Año en Cronolog</label>
+            <input
+              v-model.number="consumedYear"
+              type="number"
+              min="1900"
+              max="2100"
+              class="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style="background: var(--bg-muted); color: var(--text); border: 1px solid var(--border)"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-muted)">Fecha de consumo</label>
+            <input
+              v-model="consumedDate"
+              type="date"
+              class="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style="background: var(--bg-muted); color: var(--text); border: 1px solid var(--border)"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 mt-5">
+          <button
+            @click="showConsumedModal = false"
+            class="flex-1 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors"
+            style="color: var(--text-muted); border: 1px solid var(--border)"
+          >
+            Cancelar
+          </button>
+          <button
+            @click="confirmMarkConsumed"
+            class="flex-1 py-2.5 rounded-lg text-sm font-medium text-white cursor-pointer transition-colors"
+            style="background: #22c55e"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Spotlight search -->
     <SpotlightSearch

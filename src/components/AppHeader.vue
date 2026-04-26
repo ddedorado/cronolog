@@ -14,6 +14,8 @@ import {
   Check,
   AlertTriangle,
   WifiOff,
+  BookmarkCheck,
+  CalendarDays,
 } from "lucide-vue-next";
 import { useCronologStore } from "@/stores/cronolog";
 import { useAuth } from "@/composables/useAuth";
@@ -106,12 +108,53 @@ function handleImport() {
           Cronolog
         </h1>
         <span
-          v-if="store.hasYears"
+          v-if="store.hasYears && !store.isWishlistMode"
           class="text-sm font-mono px-1.5 py-0.5 rounded-md"
           style="color: var(--text-faint); background: var(--bg-muted)"
         >
           {{ store.activeYear }}
         </span>
+        <!-- Dashboard mode toggle -->
+        <div
+          v-if="store.hasYears"
+          class="flex items-center gap-0.5 p-0.5 rounded-lg ml-2"
+          style="background: var(--bg-muted); border: 1px solid var(--border)"
+        >
+          <button
+            @click="store.setDashboardMode('cronolog')"
+            class="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer"
+            :style="{
+              background: !store.isWishlistMode ? 'var(--bg-elevated)' : 'transparent',
+              color: !store.isWishlistMode ? 'var(--text)' : 'var(--text-faint)',
+              boxShadow: !store.isWishlistMode ? 'var(--shadow-card)' : 'none',
+            }"
+          >
+            <CalendarDays :size="13" />
+            <span class="hidden sm:inline">Cronolog</span>
+          </button>
+          <button
+            @click="store.setDashboardMode('wishlist')"
+            class="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer"
+            :style="{
+              background: store.isWishlistMode ? 'var(--bg-elevated)' : 'transparent',
+              color: store.isWishlistMode ? 'var(--text)' : 'var(--text-faint)',
+              boxShadow: store.isWishlistMode ? 'var(--shadow-card)' : 'none',
+            }"
+          >
+            <BookmarkCheck :size="13" />
+            <span class="hidden sm:inline">Wishlist</span>
+            <span
+              v-if="store.totalWishlistItems > 0"
+              class="text-[10px] font-mono px-1 rounded-full min-w-[18px] text-center"
+              :style="{
+                background: store.isWishlistMode ? 'var(--text)' : 'var(--text-faint)',
+                color: store.isWishlistMode ? 'var(--bg-elevated)' : 'var(--bg)',
+              }"
+            >
+              {{ store.totalWishlistItems }}
+            </span>
+          </button>
+        </div>
       </div>
 
       <!-- Actions -->

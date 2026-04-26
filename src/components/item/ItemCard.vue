@@ -9,6 +9,7 @@ import { ref, computed } from "vue";
 const props = defineProps<{
   item: Item;
   category: Category;
+  wishlistMode?: boolean;
 }>();
 
 const imgError = ref(false);
@@ -97,7 +98,7 @@ const visibleCustomFields = computed(() => {
 
         <!-- Consumed date -->
         <p
-          v-if="item.consumedDate"
+          v-if="item.consumedDate && !props.wishlistMode"
           class="flex items-center gap-1 text-xs mt-1.5"
           style="color: var(--text-muted)"
         >
@@ -106,9 +107,18 @@ const visibleCustomFields = computed(() => {
         </p>
 
         <!-- Rating -->
-        <div v-if="item.rating && item.rating > 0" class="mt-1.5">
+        <div v-if="item.rating && item.rating > 0 && !props.wishlistMode" class="mt-1.5">
           <StarRating :model-value="item.rating" :readonly="true" :size="13" />
         </div>
+
+        <!-- Notes preview (wishlist mode) -->
+        <p
+          v-if="props.wishlistMode && item.notes"
+          class="text-xs mt-1.5 line-clamp-2 leading-snug"
+          style="color: var(--text-faint)"
+        >
+          {{ item.notes }}
+        </p>
 
         <!-- Custom fields (Observaciones, Temporada, etc.) -->
         <div

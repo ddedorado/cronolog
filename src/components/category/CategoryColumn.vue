@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   Pencil,
   Trash2,
+  CheckCircle,
 } from "lucide-vue-next";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSortable } from "@/composables/useSortable";
@@ -20,6 +21,7 @@ const props = defineProps<{
   items: Item[];
   compact?: boolean;
   highlightItemId?: string | null;
+  wishlistMode?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +29,7 @@ const emit = defineEmits<{
   editItem: [item: Item];
   editItemForm: [item: Item];
   editCategory: [];
+  markConsumed: [item: Item];
 }>();
 
 const store = useCronologStore();
@@ -275,6 +278,17 @@ function getOriginalIndex(itemId: string): number {
               class="absolute right-0 top-0 bottom-0 flex items-stretch z-10"
             >
               <button
+                v-if="props.wishlistMode"
+                @click.stop="
+                  resetSwipe();
+                  emit('markConsumed', item);
+                "
+                class="w-20 flex items-center justify-center cursor-pointer"
+                style="background: #22c55e"
+              >
+                <CheckCircle :size="16" style="color: white" />
+              </button>
+              <button
                 @click.stop="
                   resetSwipe();
                   emit('editItemForm', item);
@@ -344,7 +358,7 @@ function getOriginalIndex(itemId: string): number {
                 </span>
               </div>
               <!-- Full view -->
-              <ItemCard v-else :item="item" :category="category" />
+              <ItemCard v-else :item="item" :category="category" :wishlist-mode="props.wishlistMode" />
             </div>
           </div>
         </div>
