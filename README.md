@@ -8,11 +8,11 @@ Registra y organiza todo lo que consumes año a año: películas, libros, series
 
 - **Vue 3.5** + TypeScript + Composition API
 - **Vite 6** + vite-plugin-pwa
-- **Pinia 3** con persistencia local + sincronización Supabase
-- **Supabase** (auth + PostgreSQL + RLS)
+- **Pinia 3** con persistencia local + sincronización Firebase
+- **Firebase** (Auth + Firestore + reglas de seguridad)
 - **Tailwind CSS v4**
-- **Vitest** + Testing Library
-- **SheetJS (xlsx)** para exportación/importación Excel
+- **Vitest** + Vue Test Utils
+- **ExcelJS** para exportación/importación Excel
 
 ## Setup
 
@@ -20,7 +20,7 @@ Registra y organiza todo lo que consumes año a año: películas, libros, series
 git clone https://github.com/ddedorado/cronolog.git
 cd cronolog
 npm install
-cp .env.example .env   # configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY
+cp .env.example .env   # configura las variables VITE_FIREBASE_*
 npm run dev
 ```
 
@@ -32,7 +32,7 @@ npm run dev
 | `npm run build`     | Build producción  |
 | `npm run preview`   | Preview del build |
 | `npm run test`      | Tests (Vitest)    |
-| `npm run typecheck` | Chequeo de tipos  |
+| `npm run test:run`  | Tests en modo CI  |
 
 ## Funcionalidades
 
@@ -45,7 +45,7 @@ npm run dev
 - **Import/Export** — JSON, CSV y Excel (.xlsx) con selección de años
 - **Importar desde** — Letterboxd, Goodreads, MyAnimeList
 - **PWA** — Instalable, funciona offline
-- **Sincronización cloud** — Supabase con RLS por usuario
+- **Sincronización cloud** — Firestore con reglas por usuario
 - **Tema claro/oscuro** + color de acento personalizable
 - **Mobile-first** — Swipe actions, pull-to-refresh, FAB, bottom sheets
 

@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import type { Item, Category } from '@/schemas/cronolog'
 import { generateId } from '@/utils/helpers'
 
@@ -118,35 +117,36 @@ export function exportCSV(opts: ExportOptions): string {
   return lines.join('\n')
 }
 
-export function exportXLSX(opts: ExportOptions): ArrayBuffer {
+export async function exportXLSX(opts: ExportOptions): Promise<ArrayBuffer> {
+  const ExcelJS = await import('exceljs')
   const filteredItems = opts.years.length > 0
     ? opts.items.filter((i) => opts.years.includes(i.year))
     : opts.items
   const rows = itemsToRows(filteredItems, opts.categories)
 
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet('Cronolog')
 
-  // Column widths
-  ws['!cols'] = [
-    { wch: 30 }, // title
-    { wch: 14 }, // category
-    { wch: 6 },  // year
-    { wch: 6 },  // rating
-    { wch: 10 }, // releaseYear
-    { wch: 12 }, // consumedDate
-    { wch: 12 }, // status
-    { wch: 8 },  // favorite
-    { wch: 30 }, // notes
-    { wch: 20 }, // tags
-    { wch: 40 }, // imageUrl
+  worksheet.columns = [
+    { header: 'title', key: 'title', width: 30 },
+    { header: 'category', key: 'category', width: 14 },
+    { header: 'year', key: 'year', width: 6 },
+    { header: 'rating', key: 'rating', width: 6 },
+    { header: 'releaseYear', key: 'releaseYear', width: 10 },
+    { header: 'consumedDate', key: 'consumedDate', width: 12 },
+    { header: 'status', key: 'status', width: 12 },
+    { header: 'favorite', key: 'favorite', width: 8 },
+    { header: 'notes', key: 'notes', width: 30 },
+    { header: 'tags', key: 'tags', width: 20 },
+    { header: 'imageUrl', key: 'imageUrl', width: 40 },
   ]
+  worksheet.addRows(rows)
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Cronolog')
-  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  const buffer = await workbook.xlsx.writeBuffer()
+  return buffer
 }
 
-export function doExport(opts: ExportOptions): { blob: Blob; filename: string } {
+export async function doExport(opts: ExportOptions): Promise<{ blob: Blob; filename: string }> {
   const dateStr = new Date().toISOString().split('T')[0]
   const yearSuffix = opts.years.length === 1 ? `-${opts.years[0]}` : opts.years.length > 1 ? `-${opts.years[0]}-${opts.years[opts.years.length - 1]}` : ''
 
@@ -166,7 +166,7 @@ export function doExport(opts: ExportOptions): { blob: Blob; filename: string } 
       }
     }
     case 'xlsx': {
-      const data = exportXLSX(opts)
+      const data = await exportXLSX(opts)
       return {
         blob: new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
         filename: `cronolog${yearSuffix}-${dateStr}.xlsx`,
@@ -322,13 +322,49 @@ export function importCSV(text: string, categories: Category[]): ImportResult {
   return parseFlatRows(rows, categories)
 }
 
-export function importXLSX(buffer: ArrayBuffer, categories: Category[]): ImportResult {
+function normalizeCellValue(value: unknown): unknown {
+  if (value === null || value === undefined) return ''
+  if (value instanceof Date) return value.toISOString().split('T')[0]
+  if (typeof value !== 'object') return value
+
+  const cellObject = value as {
+    text?: string
+    result?: unknown
+    richText?: { text?: string }[]
+  }
+  if (cellObject.text !== undefined) return cellObject.text
+  if (cellObject.result !== undefined) return normalizeCellValue(cellObject.result)
+  if (Array.isArray(cellObject.richText)) {
+    return cellObject.richText.map((part) => part.text ?? '').join('')
+  }
+  return String(value)
+}
+
+export async function importXLSX(buffer: ArrayBuffer, categories: Category[]): Promise<ImportResult> {
   try {
-    const wb = XLSX.read(buffer, { type: 'array' })
-    const sheetName = wb.SheetNames[0]
-    if (!sheetName) return { items: [], years: [], errors: ['Archivo XLSX vacío'] }
-    const ws = wb.Sheets[sheetName]
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
+    const ExcelJS = await import('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(buffer)
+
+    const worksheet = workbook.worksheets[0]
+    if (!worksheet) return { items: [], years: [], errors: ['Archivo XLSX vacío'] }
+
+    const headers: string[] = []
+    worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber - 1] = String(normalizeCellValue(cell.value)).trim()
+    })
+
+    const rows: Record<string, unknown>[] = []
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return
+      const parsedRow: Record<string, unknown> = {}
+      headers.forEach((header, index) => {
+        if (!header) return
+        parsedRow[header] = normalizeCellValue(row.getCell(index + 1).value)
+      })
+      rows.push(parsedRow)
+    })
+
     return parseFlatRows(rows, categories)
   } catch {
     return { items: [], years: [], errors: ['Error al leer archivo XLSX'] }

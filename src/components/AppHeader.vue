@@ -20,9 +20,9 @@ import {
 import { useCronologStore } from "@/stores/cronolog";
 import { useAuth } from "@/composables/useAuth";
 import {
-  useSupabaseSync,
+  useFirebaseSync,
   type SyncStatus,
-} from "@/composables/useSupabaseSync";
+} from "@/composables/useFirebaseSync";
 import { useRouter } from "vue-router";
 import { ref, computed } from "vue";
 
@@ -41,7 +41,7 @@ const emit = defineEmits<{
 
 const store = useCronologStore();
 const { displayName, signOut } = useAuth();
-const { syncStatus, isOnline } = useSupabaseSync();
+const { syncStatus, isOnline } = useFirebaseSync();
 const router = useRouter();
 const showSearch = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);

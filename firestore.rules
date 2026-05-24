@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection: each user can only read/write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Invite codes: readable by authenticated users, writable only by Cloud Functions (admin)
+    match /invite_codes/{codeId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only Cloud Functions with admin SDK can write
+    }
+  }
+}

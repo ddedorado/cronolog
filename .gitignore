@@ -3,6 +3,9 @@ node_modules
 
 # Build
 dist
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 
 # Environment
 .env
@@ -27,3 +30,6 @@ logs
 
 # Claude skills (private)
 .claude/
+
+# Local migration helpers with user-specific values
+scripts/fix-users.mjs

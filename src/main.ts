@@ -6,8 +6,8 @@ import router from './router'
 import { useCronologStore } from './stores/cronolog'
 import { useSettingsStore } from './stores/settings'
 import { useAuth } from './composables/useAuth'
-import { useSupabaseSync } from './composables/useSupabaseSync'
-import { scheduleWeeklyReminder, requestNotificationPermission } from './services/notifications'
+import { useFirebaseSync } from './composables/useFirebaseSync'
+import { scheduleWeeklyReminder } from './services/notifications'
 import './assets/main.css'
 
 const pinia = createPinia()
@@ -32,20 +32,13 @@ async function bootstrap() {
   await init()
 
   if (isAuthenticated.value) {
-    const { loadFromCloud, startWatching } = useSupabaseSync()
+    const { loadFromCloud, startWatching } = useFirebaseSync()
     await loadFromCloud()
     startWatching()
 
-    // Clean localStorage after successful cloud load (#17)
-    try {
-      localStorage.removeItem('cronolog')
-      localStorage.removeItem('settings')
-    } catch {
-      // Ignore if localStorage is unavailable
+    if ('Notification' in window && Notification.permission === 'granted') {
+      scheduleWeeklyReminder()
     }
-
-    // Schedule PWA push notification reminder
-    requestNotificationPermission().then(() => scheduleWeeklyReminder())
   }
 
   appLoading.value = false

@@ -48,5 +48,9 @@ export function scheduleWeeklyReminder() {
 }
 
 export function trackActivity() {
-  localStorage.setItem('cronolog_last_activity', String(Date.now()))
+  try {
+    localStorage.setItem('cronolog_last_activity', String(Date.now()))
+  } catch {
+    // Ignore unavailable storage.
+  }
 }

@@ -2,11 +2,19 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Category, Item } from '@/schemas/cronolog'
 import { DEFAULT_CATEGORIES } from '@/schemas/cronolog'
+import { trackActivity } from '@/services/notifications'
+
+function createDefaultCategories(): Category[] {
+  return DEFAULT_CATEGORIES.map((category) => ({
+    ...category,
+    fields: category.fields.map((field) => ({ ...field })),
+  }))
+}
 
 export const useCronologStore = defineStore(
   'cronolog',
   () => {
-    const categories = ref<Category[]>([...DEFAULT_CATEGORIES])
+    const categories = ref<Category[]>(createDefaultCategories())
     const items = ref<Item[]>([])
     const activeYear = ref(new Date().getFullYear())
     const addedYears = ref<number[]>([])
@@ -113,6 +121,7 @@ export const useCronologStore = defineStore(
     // ── Actions: Items ──
     function addItem(item: Item) {
       items.value = [...items.value, item]
+      trackActivity()
     }
 
     function updateItem(id: string, updates: Partial<Item>) {
@@ -122,11 +131,16 @@ export const useCronologStore = defineStore(
         const newItems = [...items.value]
         newItems[idx] = updated
         items.value = newItems
+        trackActivity()
       }
     }
 
     function removeItem(id: string) {
-      items.value = items.value.filter((i) => i.id !== id)
+      const nextItems = items.value.filter((i) => i.id !== id)
+      if (nextItems.length !== items.value.length) {
+        items.value = nextItems
+        trackActivity()
+      }
     }
 
     /** Remove item and return a restore function */
@@ -135,14 +149,17 @@ export const useCronologStore = defineStore(
       if (!item) return null
       const snapshot = { ...item }
       items.value = items.value.filter((i) => i.id !== id)
+      trackActivity()
       return () => {
         items.value = [...items.value, snapshot]
+        trackActivity()
       }
     }
 
     // ── Actions: Categories ──
     function addCategory(category: Category) {
       categories.value = [...categories.value, category]
+      trackActivity()
     }
 
     function updateCategory(id: string, updates: Partial<Category>) {
@@ -152,6 +169,7 @@ export const useCronologStore = defineStore(
         const newCategories = [...categories.value]
         newCategories[idx] = updated
         categories.value = newCategories
+        trackActivity()
       }
     }
 
@@ -161,6 +179,7 @@ export const useCronologStore = defineStore(
       if (!deletedCategoryIds.value.includes(id)) {
         deletedCategoryIds.value = [...deletedCategoryIds.value, id]
       }
+      trackActivity()
     }
 
     /** Remove category and return a restore function */
@@ -174,10 +193,12 @@ export const useCronologStore = defineStore(
       if (!deletedCategoryIds.value.includes(id)) {
         deletedCategoryIds.value = [...deletedCategoryIds.value, id]
       }
+      trackActivity()
       return () => {
         categories.value = [...categories.value, catSnapshot]
         items.value = [...items.value, ...itemSnapshots]
         deletedCategoryIds.value = deletedCategoryIds.value.filter((d) => d !== id)
+        trackActivity()
       }
     }
 
@@ -189,6 +210,7 @@ export const useCronologStore = defineStore(
     function addYear(year: number) {
       if (!addedYears.value.includes(year)) {
         addedYears.value = [...addedYears.value, year]
+        trackActivity()
       }
       activeYear.value = year
     }
@@ -206,6 +228,7 @@ export const useCronologStore = defineStore(
       // Now mutate
       addedYears.value = addedYears.value.filter((y) => y !== year)
       items.value = items.value.filter((i) => i.year !== year)
+      trackActivity()
 
       if (nextYear !== null) {
         activeYear.value = nextYear
@@ -226,6 +249,7 @@ export const useCronologStore = defineStore(
       if (data.categories) categories.value = data.categories
       if (data.items) items.value = data.items
       if (data.addedYears) addedYears.value = data.addedYears
+      trackActivity()
     }
 
     // ── Actions: Dashboard mode ──
@@ -235,6 +259,7 @@ export const useCronologStore = defineStore(
 
     function addWishlistItem(item: Item) {
       items.value = [...items.value, { ...item, year: 0, status: 'backlog', rating: 0, consumedDate: '' }]
+      trackActivity()
     }
 
     function markAsConsumed(itemId: string, options?: { year?: number; rating?: number; consumedDate?: string }) {
@@ -246,6 +271,15 @@ export const useCronologStore = defineStore(
       if (!addedYears.value.includes(year)) {
         addedYears.value = [...addedYears.value, year]
       }
+    }
+
+    function resetState() {
+      categories.value = createDefaultCategories()
+      items.value = []
+      activeYear.value = new Date().getFullYear()
+      addedYears.value = []
+      deletedCategoryIds.value = []
+      dashboardMode.value = 'cronolog'
     }
 
     // ── Migration: ensure addedYears includes years from items + activeYear ──
@@ -417,6 +451,7 @@ export const useCronologStore = defineStore(
       setDashboardMode,
       addWishlistItem,
       markAsConsumed,
+      resetState,
       migrateData,
     }
   },

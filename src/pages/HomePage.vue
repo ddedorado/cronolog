@@ -4,7 +4,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { useTheme } from "@/composables/useTheme";
 import { useEnrichmentQueue } from "@/composables/useEnrichmentQueue";
 import { usePullToRefresh } from "@/composables/usePullToRefresh";
-import { useSupabaseSync } from "@/composables/useSupabaseSync";
+import { useFirebaseSync } from "@/composables/useFirebaseSync";
 import AppHeader from "@/components/AppHeader.vue";
 import MobileNav from "@/components/MobileNav.vue";
 import YearSelector from "@/components/year/YearSelector.vue";
@@ -71,7 +71,7 @@ const store = useCronologStore();
 const settingsStore = useSettingsStore();
 const { isDark, toggleDark } = useTheme();
 const { enqueueItem } = useEnrichmentQueue();
-const { loadFromCloud } = useSupabaseSync();
+const { loadFromCloud } = useFirebaseSync();
 
 // Search
 const searchQuery = ref("");

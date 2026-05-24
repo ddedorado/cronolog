@@ -3,7 +3,6 @@ import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useToast } from "@/composables/useToast";
-import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
   User,
@@ -17,7 +16,7 @@ import {
 import ConfirmModal from "@/components/ConfirmModal.vue";
 
 const router = useRouter();
-const { user, displayName, signOut } = useAuth();
+const { user, displayName, signOut, updateUserProfile, updateUserPassword } = useAuth();
 const toast = useToast();
 
 const newDisplayName = ref(displayName.value);
@@ -54,10 +53,7 @@ async function updateProfile() {
   if (!canSaveProfile.value) return;
   saving.value = true;
   try {
-    const { error } = await supabase.auth.updateUser({
-      data: { display_name: newDisplayName.value.trim() },
-    });
-    if (error) throw error;
+    await updateUserProfile({ displayName: newDisplayName.value.trim() });
     toast.success("Nombre actualizado");
   } catch (err: any) {
     toast.error(err?.message ?? "Error al actualizar perfil");
@@ -70,10 +66,7 @@ async function updatePassword() {
   if (!canSavePassword.value) return;
   saving.value = true;
   try {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword.value,
-    });
-    if (error) throw error;
+    await updateUserPassword(newPassword.value);
     newPassword.value = "";
     confirmPassword.value = "";
     toast.success("Contraseña actualizada");
@@ -85,7 +78,7 @@ async function updatePassword() {
 }
 
 async function handleDeleteAccount() {
-  // Note: Supabase doesn't allow self-deletion via client API by default.
+  // Note: Firebase doesn't allow self-deletion via client API by default.
   // We sign out and notify the user to contact support.
   toast.info(
     "Cuenta marcada para eliminación. Contacta soporte para completar.",

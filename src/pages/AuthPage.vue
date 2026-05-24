@@ -2,7 +2,7 @@
 import { ref, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
-import { useSupabaseSync } from "@/composables/useSupabaseSync";
+import { useFirebaseSync } from "@/composables/useFirebaseSync";
 import { useTheme } from "@/composables/useTheme";
 import { validateInviteCode, redeemInviteCode, isInviteOnly, type InviteResult } from "@/utils/invite";
 import {
@@ -26,8 +26,8 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
-const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
-const { loadFromCloud, startWatching, migrateLocalData } = useSupabaseSync();
+const { signIn, signUp, signInWithGoogle, signOut, deleteCurrentUser, resetPassword } = useAuth();
+const { loadFromCloud, startWatching, migrateLocalData } = useFirebaseSync();
 const { isDark, toggleDark } = useTheme();
 
 const mode = ref<"login" | "register" | "forgot">("login");
@@ -137,23 +137,39 @@ watch(mode, () => {
   success.value = "";
 });
 
+function inviteErrorMessage(result: InviteResult) {
+  if (result.reason === "exhausted") {
+    return "Este código de invitación ha agotado sus usos";
+  }
+  if (result.reason === "expired") {
+    return "Este código de invitación ha expirado";
+  }
+  return "Código de invitación no válido";
+}
+
+async function validateInviteForRegistration() {
+  if (!requiresInvite) return true;
+  const result = await validateInviteCode(inviteCode.value);
+  if (!result.valid) {
+    error.value = inviteErrorMessage(result);
+    touched.value.invite = true;
+    return false;
+  }
+  return true;
+}
+
+async function redeemInviteForRegistration() {
+  if (!requiresInvite) return true;
+  const result = await redeemInviteCode(inviteCode.value);
+  if (!result.valid) {
+    error.value = inviteErrorMessage(result);
+    return false;
+  }
+  return true;
+}
+
 async function handleSubmit() {
   if (!isFormValid.value) return;
-
-  // Validate & redeem invite code before calling Supabase
-  if (mode.value === "register" && requiresInvite) {
-    const result = await redeemInviteCode(inviteCode.value);
-    if (!result.valid) {
-      if (result.reason === "exhausted") {
-        error.value = "Este código de invitación ha agotado sus usos";
-      } else if (result.reason === "expired") {
-        error.value = "Este código de invitación ha expirado";
-      } else {
-        error.value = "Código de invitación no válido";
-      }
-      return;
-    }
-  }
 
   loading.value = true;
   error.value = "";
@@ -166,33 +182,39 @@ async function handleSubmit() {
       startWatching();
       router.push("/");
     } else if (mode.value === "register") {
+      if (!(await validateInviteForRegistration())) return;
       await signUp(
         email.value.trim(),
         password.value,
         displayName.value.trim(),
       );
-      // Show confirm email screen
-      showConfirmEmail.value = true;
-      loading.value = false;
-      return;
+
+      if (!(await redeemInviteForRegistration())) {
+        await deleteCurrentUser().catch(() => signOut());
+        return;
+      }
+
+      await migrateLocalData();
+      await loadFromCloud();
+      startWatching();
+      router.push("/");
     } else if (mode.value === "forgot") {
       await resetPassword(email.value.trim());
       success.value =
         "Se ha enviado un enlace de recuperación a tu correo electrónico.";
     }
   } catch (err: any) {
-    const msg = err?.message ?? "Error desconocido";
-    if (msg.includes("Invalid login")) {
+    const msg = err?.code ?? err?.message ?? "Error desconocido";
+    if (msg.includes("auth/invalid-credential") || msg.includes("auth/wrong-password") || msg.includes("auth/user-not-found")) {
       error.value = "Email o contraseña incorrectos";
-    } else if (msg.includes("already registered")) {
+    } else if (msg.includes("auth/email-already-in-use")) {
       error.value = "Este email ya está registrado";
-    } else if (msg.includes("Email not confirmed")) {
-      error.value = "Revisa tu correo para confirmar la cuenta";
-    } else if (msg.includes("email_address_not_authorized")) {
-      // Supabase returns this when email confirm is required but user tries to log in
-      showConfirmEmail.value = true;
+    } else if (msg.includes("auth/too-many-requests")) {
+      error.value = "Demasiados intentos. Intenta más tarde.";
+    } else if (msg.includes("auth/weak-password")) {
+      error.value = "La contraseña es demasiado débil";
     } else {
-      error.value = msg;
+      error.value = err?.message ?? msg;
     }
   } finally {
     loading.value = false;
@@ -200,22 +222,30 @@ async function handleSubmit() {
 }
 
 async function handleGoogleLogin() {
-  // In register mode, validate invite code first
-  if (mode.value === "register" && requiresInvite) {
-    if (!inviteValid.value) {
-      touched.value.invite = true;
-      error.value =
-        "Introduce un código de invitación válido antes de continuar con Google.";
-      return;
-    }
-  }
-
   loading.value = true;
   error.value = "";
   try {
-    await signInWithGoogle();
+    if (mode.value === "register" && !(await validateInviteForRegistration())) {
+      return;
+    }
+
+    const googleResult = await signInWithGoogle();
+
+    if (
+      mode.value === "register" &&
+      googleResult.isNewUser &&
+      !(await redeemInviteForRegistration())
+    ) {
+      await deleteCurrentUser().catch(() => signOut());
+      return;
+    }
+
+    await loadFromCloud();
+    startWatching();
+    router.push("/");
   } catch (err: any) {
     error.value = err?.message ?? "Error al iniciar con Google";
+  } finally {
     loading.value = false;
   }
 }

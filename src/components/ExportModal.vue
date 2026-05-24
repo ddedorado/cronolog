@@ -28,6 +28,7 @@ const toast = useToast();
 const format = ref<ExportFormat>("xlsx");
 const selectedYears = ref<number[]>([...store.availableYears]);
 const showModelHelp = ref(false);
+const exporting = ref(false);
 
 const formats: {
   value: ExportFormat;
@@ -81,30 +82,38 @@ const itemCount = computed(() => {
   return store.items.filter((i) => selectedYears.value.includes(i.year)).length;
 });
 
-function handleExport() {
+async function handleExport() {
+  if (exporting.value) return;
   if (selectedYears.value.length === 0 && format.value !== "json") {
     toast.error("Selecciona al menos un año");
     return;
   }
-  const result = doExport({
-    format: format.value,
-    years: selectedYears.value,
-    categories: store.categories,
-    items: store.items,
-    addedYears: store.addedYears,
-  });
+  exporting.value = true;
+  try {
+    const result = await doExport({
+      format: format.value,
+      years: selectedYears.value,
+      categories: store.categories,
+      items: store.items,
+      addedYears: store.addedYears,
+    });
 
-  const url = URL.createObjectURL(result.blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = result.filename;
-  a.click();
-  URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(result.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = result.filename;
+    a.click();
+    URL.revokeObjectURL(url);
 
-  toast.success(
-    `${itemCount.value} items exportados como ${format.value.toUpperCase()}`,
-  );
-  emit("close");
+    toast.success(
+      `${itemCount.value} items exportados como ${format.value.toUpperCase()}`,
+    );
+    emit("close");
+  } catch {
+    toast.error("Error al exportar datos");
+  } finally {
+    exporting.value = false;
+  }
 }
 </script>
 
@@ -324,12 +333,12 @@ function handleExport() {
       <!-- Export button -->
       <button
         @click="handleExport"
-        :disabled="itemCount === 0"
+        :disabled="itemCount === 0 || exporting"
         class="w-full py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style="background: var(--text); color: var(--bg)"
       >
         <Download :size="14" />
-        Exportar {{ itemCount }} items
+        {{ exporting ? "Exportando..." : `Exportar ${itemCount} items` }}
       </button>
     </div>
   </div>

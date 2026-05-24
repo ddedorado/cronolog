@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/supabase'
+import { functions } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
 
 // ── Types ────────────────────────────────────────────────
 export interface InviteResult {
@@ -19,16 +20,14 @@ export async function validateInviteCode(code: string): Promise<InviteResult> {
   const trimmed = code.trim()
   if (!trimmed) return { valid: false, reason: 'invalid' }
 
-  const { data, error } = await supabase.rpc('validate_invite_code', {
-    input_code: trimmed,
-  })
-
-  if (error) {
-    console.error('validate_invite_code RPC error', error)
+  try {
+    const validateFn = httpsCallable<{ code: string }, InviteResult>(functions, 'validateInviteCode')
+    const result = await validateFn({ code: trimmed })
+    return result.data
+  } catch (err) {
+    console.error('validateInviteCode error', err)
     return { valid: false, reason: 'invalid' }
   }
-
-  return data as InviteResult
 }
 
 // ── Redeem (atomic consume, call on registration submit) ─
@@ -36,14 +35,12 @@ export async function redeemInviteCode(code: string): Promise<InviteResult> {
   const trimmed = code.trim()
   if (!trimmed) return { valid: false, reason: 'invalid' }
 
-  const { data, error } = await supabase.rpc('redeem_invite_code', {
-    input_code: trimmed,
-  })
-
-  if (error) {
-    console.error('redeem_invite_code RPC error', error)
+  try {
+    const redeemFn = httpsCallable<{ code: string }, InviteResult>(functions, 'redeemInviteCode')
+    const result = await redeemFn({ code: trimmed })
+    return result.data
+  } catch (err) {
+    console.error('redeemInviteCode error', err)
     return { valid: false, reason: 'invalid' }
   }
-
-  return data as InviteResult
 }

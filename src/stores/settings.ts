@@ -9,6 +9,15 @@ export interface ApiKeys {
   comicvine: string
 }
 
+const DEFAULT_API_KEYS: ApiKeys = {
+  tmdb: '',
+  rawg: '',
+  googlebooks: '',
+  comicvine: '',
+}
+
+const DEFAULT_ACCENT_COLOR = '#3B82F6'
+
 // Sources that work without API keys
 const NO_KEY_SOURCES: DataSource[] = ['openlibrary', 'musicbrainz', 'jikan']
 // Sources that have optional keys (work without but better with)
@@ -17,14 +26,9 @@ const OPTIONAL_KEY_SOURCES: DataSource[] = ['googlebooks']
 export const useSettingsStore = defineStore(
   'settings',
   () => {
-    const apiKeys = ref<ApiKeys>({
-      tmdb: '',
-      rawg: '',
-      googlebooks: '',
-      comicvine: '',
-    })
+    const apiKeys = ref<ApiKeys>({ ...DEFAULT_API_KEYS })
     const autoEnrich = ref(true)
-    const accentColor = ref('#3B82F6')
+    const accentColor = ref(DEFAULT_ACCENT_COLOR)
 
     // Ensure all apiKeys fields exist (handles persisted state missing newer keys)
     function ensureApiKeys() {
@@ -55,6 +59,12 @@ export const useSettingsStore = defineStore(
       return apiKeys.value[source as keyof ApiKeys] ?? ''
     }
 
+    function resetState() {
+      apiKeys.value = { ...DEFAULT_API_KEYS }
+      autoEnrich.value = true
+      accentColor.value = DEFAULT_ACCENT_COLOR
+    }
+
     return {
       apiKeys,
       autoEnrich,
@@ -62,6 +72,7 @@ export const useSettingsStore = defineStore(
       hasKeyForSource,
       getKey,
       ensureApiKeys,
+      resetState,
     }
   },
   {

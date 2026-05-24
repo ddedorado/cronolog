@@ -84,10 +84,10 @@ function onFileSelect(event: Event) {
 
     if (fileFormat.value === "xlsx") {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const buffer = e.target?.result as ArrayBuffer;
         fileContent.value = buffer;
-        const result = importXLSX(buffer, store.categories);
+        const result = await importXLSX(buffer, store.categories);
         previewCount.value = result.items.length;
         previewYears.value = result.years;
         previewErrors.value = result.errors;
@@ -134,14 +134,14 @@ function onFileSelect(event: Event) {
   }
 }
 
-function doImport() {
+async function doImport() {
   if (!fileContent.value) return;
 
   try {
     if (sourceType.value === "cronolog") {
       let result;
       if (fileFormat.value === "xlsx") {
-        result = importXLSX(fileContent.value as ArrayBuffer, store.categories);
+        result = await importXLSX(fileContent.value as ArrayBuffer, store.categories);
       } else if (fileFormat.value === "json") {
         result = importJSON(fileContent.value as string, store.categories);
       } else {

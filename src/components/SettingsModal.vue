@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Bell,
 } from "lucide-vue-next";
 import { verifyTMDBKey } from "@/services/enrichment/tmdb";
 import { verifyRAWGKey } from "@/services/enrichment/rawg";
@@ -16,6 +17,10 @@ import { verifyGoogleBooksKey } from "@/services/enrichment/googlebooks";
 import { verifyComicVineKey } from "@/services/enrichment/comicvine";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { useDragToDismiss } from "@/composables/useDragToDismiss";
+import {
+  requestNotificationPermission,
+  scheduleWeeklyReminder,
+} from "@/services/notifications";
 
 useBodyScrollLock();
 
@@ -30,6 +35,9 @@ const googlebooksKey = ref(settings.apiKeys.googlebooks ?? "");
 const comicvineKey = ref(settings.apiKeys.comicvine ?? "");
 const autoEnrich = ref(settings.autoEnrich);
 const accentColor = ref(settings.accentColor);
+const notificationPermission = ref<NotificationPermission | "unsupported">(
+  "Notification" in window ? Notification.permission : "unsupported",
+);
 
 const accentColors = [
   "#3B82F6",
@@ -85,6 +93,13 @@ async function verifyComicvine() {
   comicvineStatus.value = "loading";
   const ok = await verifyComicVineKey(comicvineKey.value.trim());
   comicvineStatus.value = ok ? "ok" : "error";
+}
+
+async function enableReminders() {
+  const ok = await requestNotificationPermission();
+  notificationPermission.value =
+    "Notification" in window ? Notification.permission : "unsupported";
+  if (ok) scheduleWeeklyReminder();
 }
 
 function save() {
@@ -165,6 +180,41 @@ function handleBackdropClick(e: MouseEvent) {
               transform: autoEnrich ? 'translateX(20px)' : 'translateX(0)',
             }"
           />
+        </button>
+      </div>
+
+      <!-- Reminder permission -->
+      <div class="flex items-center justify-between mb-6 gap-4">
+        <div>
+          <p class="text-sm font-medium" style="color: var(--text)">
+            Recordatorios
+          </p>
+          <p class="text-xs mt-0.5" style="color: var(--text-muted)">
+            {{
+              notificationPermission === "granted"
+                ? "Activos"
+                : notificationPermission === "denied"
+                  ? "Bloqueados en el navegador"
+                  : "Desactivados"
+            }}
+          </p>
+        </div>
+        <button
+          @click="enableReminders"
+          :disabled="
+            notificationPermission === 'granted' ||
+            notificationPermission === 'denied' ||
+            notificationPermission === 'unsupported'
+          "
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          style="
+            background: var(--bg-muted);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+          "
+        >
+          <Bell :size="14" />
+          {{ notificationPermission === "granted" ? "Activo" : "Activar" }}
         </button>
       </div>
 
