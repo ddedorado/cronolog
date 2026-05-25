@@ -1,11 +1,17 @@
 import { ref, watch } from 'vue'
-import { db } from '@/lib/firebase'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { useCronologStore } from '@/stores/cronolog'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
-import { DEFAULT_CATEGORIES } from '@/schemas/cronolog'
+import {
+  createCloudState,
+  hasCloudStateChanges,
+  type CronologCloudState,
+} from '@/services/firestoreModel'
+import {
+  loadCronologCloudState,
+  saveCronologCloudState,
+} from '@/services/firestoreCronolog'
 import {
   hasSyncWatchers,
   setSyncWatchers,
@@ -15,6 +21,7 @@ import {
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 let isSyncing = false
 let lastSyncedAt: string | null = null
+let lastCloudState: CronologCloudState | null = null
 
 // Shared reactive sync state
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error' | 'offline'
@@ -38,6 +45,33 @@ export function useFirebaseSync() {
   const settings = useSettingsStore()
   const { user, isAuthenticated } = useAuth()
   const toast = useToast()
+
+  function getCurrentCloudState() {
+    return createCloudState({
+      categories: store.categories,
+      items: store.items,
+      addedYears: store.addedYears,
+      deletedCategoryIds: store.deletedCategoryIds,
+      dashboardMode: store.dashboardMode,
+      settings: {
+        apiKeys: settings.apiKeys,
+        autoEnrich: settings.autoEnrich,
+        accentColor: settings.accentColor,
+      },
+      updatedAt: lastSyncedAt,
+    })
+  }
+
+  function applyCloudState(cloudState: CronologCloudState) {
+    store.categories = cloudState.categories
+    store.items = cloudState.items
+    store.addedYears = cloudState.addedYears
+    store.deletedCategoryIds = cloudState.deletedCategoryIds
+    store.dashboardMode = cloudState.dashboardMode
+    settings.apiKeys = cloudState.settings.apiKeys
+    settings.autoEnrich = cloudState.settings.autoEnrich
+    settings.accentColor = cloudState.settings.accentColor
+  }
 
   /** Retry with exponential backoff */
   async function withRetry<T>(
@@ -64,37 +98,37 @@ export function useFirebaseSync() {
     if (!user.value) return false
 
     try {
-      const docRef = doc(db, 'users', user.value.uid)
-      const docSnap = await getDoc(docRef)
+      const uid = user.value.uid
+      const result = await loadCronologCloudState(uid)
 
-      if (!docSnap.exists()) {
+      if (!result.state) {
+        lastCloudState = null
+        lastSyncedAt = null
         syncStatus.value = isOnline.value ? 'idle' : 'offline'
         return false
       }
 
-      const data = docSnap.data()
       isSyncing = true
       try {
-        const cats = data.categories ?? DEFAULT_CATEGORIES
-        const items = data.items ?? []
-        const years = data.addedYears ?? []
-
-        store.categories = cats
-        store.items = items
-        store.addedYears = years
-
-        if (data.settings) {
-          if (data.settings.apiKeys) {
-            settings.apiKeys = data.settings.apiKeys
-          }
-          if (typeof data.settings.autoEnrich === 'boolean') {
-            settings.autoEnrich = data.settings.autoEnrich
-          }
-        }
+        applyCloudState(result.state)
 
         store.migrateData()
+
+        const migratedState = getCurrentCloudState()
+        const shouldPersistMigration = result.source === 'legacy'
+          || hasCloudStateChanges(result.state, migratedState)
+
+        if (shouldPersistMigration) {
+          const baseline = result.source === 'v2' ? result.state : null
+          const saveResult = await saveCronologCloudState(uid, migratedState, baseline)
+          lastCloudState = saveResult.state
+          lastSyncedAt = saveResult.updatedAt
+        } else {
+          lastCloudState = result.state
+          lastSyncedAt = result.state.updatedAt
+        }
+
         syncStatus.value = 'saved'
-        lastSyncedAt = data.updatedAt ?? null
       } finally {
         isSyncing = false
       }
@@ -128,21 +162,14 @@ export function useFirebaseSync() {
 
     try {
       await withRetry(async () => {
-        const now = new Date().toISOString()
-        const docRef = doc(db, 'users', user.value!.uid)
+        const saveResult = await saveCronologCloudState(
+          user.value!.uid,
+          getCurrentCloudState(),
+          lastCloudState,
+        )
 
-        await setDoc(docRef, {
-          categories: store.categories,
-          items: store.items,
-          addedYears: store.addedYears,
-          settings: {
-            apiKeys: settings.apiKeys,
-            autoEnrich: settings.autoEnrich,
-          },
-          updatedAt: now,
-        })
-
-        lastSyncedAt = now
+        lastCloudState = saveResult.state
+        lastSyncedAt = saveResult.updatedAt
       })
 
       syncStatus.value = 'saved'
@@ -178,13 +205,19 @@ export function useFirebaseSync() {
     if (hasSyncWatchers()) return
 
     const stopStoreWatch = watch(
-      () => [store.categories, store.items, store.addedYears],
+      () => [
+        store.categories,
+        store.items,
+        store.addedYears,
+        store.deletedCategoryIds,
+        store.dashboardMode,
+      ],
       () => debouncedSave(),
       { deep: true },
     )
 
     const stopSettingsWatch = watch(
-      () => [settings.apiKeys, settings.autoEnrich],
+      () => [settings.apiKeys, settings.autoEnrich, settings.accentColor],
       () => debouncedSave(),
       { deep: true },
     )
@@ -213,15 +246,21 @@ export function useFirebaseSync() {
   async function migrateLocalData() {
     if (!user.value) return false
 
-    const hasLocalData = store.items.length > 0 || store.addedYears.length > 0
+    const hasLocalData = store.items.length > 0
+      || store.addedYears.length > 0
+      || store.deletedCategoryIds.length > 0
     if (!hasLocalData) return false
 
     try {
-      const docRef = doc(db, 'users', user.value.uid)
-      const docSnap = await getDoc(docRef)
+      const cloudData = await loadCronologCloudState(user.value.uid)
 
-      if (!docSnap.exists()) {
+      if (cloudData.source === 'empty') {
         return saveToCloud()
+      }
+
+      if (cloudData.state) {
+        lastCloudState = cloudData.state
+        lastSyncedAt = cloudData.state.updatedAt
       }
     } catch (err: any) {
       syncStatus.value = !isOnline.value || err?.code === 'unavailable' ? 'offline' : 'error'

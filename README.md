@@ -49,6 +49,21 @@ npm run dev
 - **Tema claro/oscuro** + color de acento personalizable
 - **Mobile-first** — Swipe actions, pull-to-refresh, FAB, bottom sheets
 
+## Modelo cloud
+
+Cronolog persiste los datos en Firestore con documentos pequeños por usuario:
+
+```text
+/users/{uid}                         # metadatos: schemaVersion, updatedAt
+/users/{uid}/categories/{categoryId} # una categoría por documento
+/users/{uid}/items/{itemId}          # un item por documento
+/users/{uid}/years/{year}            # años visibles del cronolog
+/users/{uid}/settings/app            # API keys, autoEnrich, accentColor
+/users/{uid}/meta/app                # deletedCategoryIds, dashboardMode
+```
+
+Las instalaciones que aún tengan el documento legacy con arrays grandes se migran automáticamente al iniciar sesión. Tras escribir las subcolecciones, el cliente limpia los campos grandes (`categories`, `items`, `addedYears`, `settings`) del documento raíz.
+
 ## Modelo de datos (Import/Export)
 
 Para importar datos en formato **CSV** o **Excel (.xlsx)**, usa estas columnas como cabecera:
